@@ -1,8 +1,9 @@
 import 'dart:io';
 import 'dart:typed_data';
 import 'package:path/path.dart' as p;
-import 'package:path_provider/path_provider.dart';
+import 'package:path_provider/path_provider.dart' as path_provider;
 import 'package:uuid/uuid.dart';
+import '../constants/app_constants.dart';
 import '../errors/exceptions.dart';
 
 /// Abstract service interface for managing file system storage and caching.
@@ -38,6 +39,9 @@ abstract class FileStorageService {
 
   /// Clears temporary cache files.
   Future<void> clearTempFiles();
+
+  /// Safely deletes an individual file if it exists.
+  Future<void> deleteFile(String filePath);
 }
 
 /// Implementation of [FileStorageService] using `path_provider`.
@@ -49,7 +53,7 @@ class FileStorageServiceImpl implements FileStorageService {
   @override
   Future<Directory> getAppDocumentsDirectory() async {
     try {
-      return await getApplicationDocumentsDirectory();
+      return await path_provider.getApplicationDocumentsDirectory();
     } catch (e) {
       throw StorageException('Failed to get app documents directory: $e', e);
     }
@@ -58,7 +62,7 @@ class FileStorageServiceImpl implements FileStorageService {
   @override
   Future<Directory> getTemporaryDirectory() async {
     try {
-      final dir = await getTemporaryDirectory();
+      final dir = await path_provider.getTemporaryDirectory();
       return dir;
     } catch (e) {
       throw StorageException('Failed to get temporary directory: $e', e);
@@ -68,8 +72,10 @@ class FileStorageServiceImpl implements FileStorageService {
   @override
   Future<Directory> getOrCreateDocumentDirectory(String documentId) async {
     try {
-      final appDocs = await getApplicationDocumentsDirectory();
-      final docDir = Directory(p.join(appDocs.path, 'documents', documentId));
+      final appDocs = await path_provider.getApplicationDocumentsDirectory();
+      final docDir = Directory(
+        p.join(appDocs.path, AppConstants.documentsDir, documentId),
+      );
       if (!await docDir.exists()) {
         await docDir.create(recursive: true);
       }
@@ -123,8 +129,10 @@ class FileStorageServiceImpl implements FileStorageService {
   @override
   Future<void> deleteDocumentDirectory(String documentId) async {
     try {
-      final appDocs = await getApplicationDocumentsDirectory();
-      final docDir = Directory(p.join(appDocs.path, 'documents', documentId));
+      final appDocs = await path_provider.getApplicationDocumentsDirectory();
+      final docDir = Directory(
+        p.join(appDocs.path, AppConstants.documentsDir, documentId),
+      );
       if (await docDir.exists()) {
         await docDir.delete(recursive: true);
       }
@@ -138,7 +146,7 @@ class FileStorageServiceImpl implements FileStorageService {
     try {
       final tempDir = await getTemporaryDirectory();
       final ext = extension.startsWith('.') ? extension : '.$extension';
-      final tempFolder = Directory(p.join(tempDir.path, 'anuscan_temp'));
+      final tempFolder = Directory(p.join(tempDir.path, AppConstants.tempDir));
       if (!await tempFolder.exists()) {
         await tempFolder.create(recursive: true);
       }
@@ -152,9 +160,21 @@ class FileStorageServiceImpl implements FileStorageService {
   Future<void> clearTempFiles() async {
     try {
       final tempDir = await getTemporaryDirectory();
-      final tempFolder = Directory(p.join(tempDir.path, 'anuscan_temp'));
+      final tempFolder = Directory(p.join(tempDir.path, AppConstants.tempDir));
       if (await tempFolder.exists()) {
         await tempFolder.delete(recursive: true);
+      }
+    } catch (e) {
+      // Non-critical, ignore silent failure
+    }
+  }
+
+  @override
+  Future<void> deleteFile(String filePath) async {
+    try {
+      final file = File(filePath);
+      if (await file.exists()) {
+        await file.delete();
       }
     } catch (e) {
       // Non-critical, ignore silent failure

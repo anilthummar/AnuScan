@@ -47,11 +47,29 @@ void main() {
         created_at INTEGER NOT NULL
       )
     ''');
+    await db.execute('''
+      CREATE TABLE ocr_page_results (
+        id TEXT PRIMARY KEY,
+        document_id TEXT NOT NULL,
+        page_id TEXT NOT NULL UNIQUE,
+        page_index INTEGER NOT NULL,
+        image_path TEXT NOT NULL,
+        extracted_text TEXT NOT NULL,
+        status TEXT NOT NULL,
+        confidence REAL NOT NULL DEFAULT 0.0,
+        blocks_json TEXT,
+        processing_duration_ms INTEGER NOT NULL DEFAULT 0,
+        created_at INTEGER NOT NULL
+      )
+    ''');
 
     appDatabase = AppDatabase(initialDatabase: db);
     dataSource = LocalDocumentDataSourceImpl(appDatabase);
     mockStorageService = MockFileStorageService();
-    when(() => mockStorageService.deleteDocumentDirectory(any())).thenAnswer((_) async {});
+    when(
+      () => mockStorageService.deleteDocumentDirectory(any()),
+    ).thenAnswer((_) async {});
+    when(() => mockStorageService.clearTempFiles()).thenAnswer((_) async {});
 
     repository = DocumentRepositoryImpl(
       localDataSource: dataSource,
@@ -149,22 +167,27 @@ void main() {
     expect(searchResults.first.title, equals('Passport Scan'));
   });
 
-  test('deleteDocument removes from SQLite and calls storage cleanup', () async {
-    final now = DateTime.now();
-    final doc = DocumentEntity(
-      id: 'to_delete',
-      title: 'Draft',
-      pdfPath: '/draft.pdf',
-      pageCount: 1,
-      createdAt: now,
-      updatedAt: now,
-    );
+  test(
+    'deleteDocument removes from SQLite and calls storage cleanup',
+    () async {
+      final now = DateTime.now();
+      final doc = DocumentEntity(
+        id: 'to_delete',
+        title: 'Draft',
+        pdfPath: '/draft.pdf',
+        pageCount: 1,
+        createdAt: now,
+        updatedAt: now,
+      );
 
-    await repository.saveDocument(doc);
-    expect(await repository.getDocumentById('to_delete'), isNotNull);
+      await repository.saveDocument(doc);
+      expect(await repository.getDocumentById('to_delete'), isNotNull);
 
-    await repository.deleteDocument('to_delete');
-    expect(await repository.getDocumentById('to_delete'), isNull);
-    verify(() => mockStorageService.deleteDocumentDirectory('to_delete')).called(1);
-  });
+      await repository.deleteDocument('to_delete');
+      expect(await repository.getDocumentById('to_delete'), isNull);
+      verify(
+        () => mockStorageService.deleteDocumentDirectory('to_delete'),
+      ).called(1);
+    },
+  );
 }

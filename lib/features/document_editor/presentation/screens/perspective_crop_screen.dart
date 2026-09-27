@@ -6,25 +6,21 @@ import '../widgets/perspective_crop_widget.dart';
 
 /// Screen allowing the user to adjust the 4 corner points of a document page.
 class PerspectiveCropScreen extends StatefulWidget {
-  const PerspectiveCropScreen({
-    super.key,
-    required this.page,
-  });
+  const PerspectiveCropScreen({super.key, required this.page});
 
-  final ScannedPage page;
+  final ScanPage page;
 
   @override
   State<PerspectiveCropScreen> createState() => _PerspectiveCropScreenState();
 }
 
 class _PerspectiveCropScreenState extends State<PerspectiveCropScreen> {
-  final GlobalKey<_PerspectiveCropScreenState> _widgetKey = GlobalKey();
-  DocumentCornerPoints? _currentCorners;
+  CropCorners? _currentCorners;
 
   @override
   void initState() {
     super.initState();
-    _currentCorners = widget.page.corners ?? DocumentCornerPoints.fullBounds();
+    _currentCorners = widget.page.corners ?? CropCorners.fullBounds();
   }
 
   @override
@@ -44,7 +40,7 @@ class _PerspectiveCropScreenState extends State<PerspectiveCropScreen> {
             icon: const Icon(Icons.refresh),
             onPressed: () {
               setState(() {
-                _currentCorners = DocumentCornerPoints.fullBounds();
+                _currentCorners = CropCorners.fullBounds();
               });
             },
           ),
@@ -59,7 +55,11 @@ class _PerspectiveCropScreenState extends State<PerspectiveCropScreen> {
               color: Colors.white10,
               child: const Row(
                 children: [
-                  Icon(Icons.crop_free, color: AppColors.primaryLight, size: 20),
+                  Icon(
+                    Icons.crop_free,
+                    color: AppColors.primaryLight,
+                    size: 20,
+                  ),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
@@ -76,7 +76,6 @@ class _PerspectiveCropScreenState extends State<PerspectiveCropScreen> {
               child: Padding(
                 padding: const EdgeInsets.all(16.0),
                 child: PerspectiveCropWidget(
-                  key: _widgetKey,
                   imagePath: widget.page.originalImagePath,
                   imageWidth: widget.page.width,
                   imageHeight: widget.page.height,

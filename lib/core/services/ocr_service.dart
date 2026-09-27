@@ -22,18 +22,27 @@ class OcrResult extends Equatable {
     required this.fullText,
     this.blocks = const [],
     this.suggestedTitle,
+    this.language,
+    this.processingDurationMs,
   });
 
   final String fullText;
   final List<OcrTextBlock> blocks;
   final String? suggestedTitle;
+  final String? language;
+  final int? processingDurationMs;
 
   @override
-  List<Object?> get props => [fullText, blocks, suggestedTitle];
+  List<Object?> get props => [
+    fullText,
+    blocks,
+    suggestedTitle,
+    language,
+    processingDurationMs,
+  ];
 }
 
 /// Abstract contract for Optical Character Recognition (OCR) and text extraction.
-/// Ready for future ML Kit Text Recognition integration.
 abstract class OcrService {
   /// Whether OCR is supported and enabled on the current device.
   Future<bool> isSupported();
@@ -43,6 +52,9 @@ abstract class OcrService {
 
   /// Suggests a document title from document contents.
   Future<String?> generateTitleFromContent(String imagePath);
+
+  /// Releases any underlying OCR engine resources.
+  Future<void> dispose();
 }
 
 /// Default stub implementation of [OcrService] ready for extension.
@@ -61,4 +73,7 @@ class StubOcrServiceImpl implements OcrService {
   Future<String?> generateTitleFromContent(String imagePath) async {
     return null;
   }
+
+  @override
+  Future<void> dispose() async {}
 }

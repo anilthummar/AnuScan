@@ -6,30 +6,36 @@ import '../../../../core/services/file_storage_service.dart';
 import '../../../../core/services/image_processing_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/scanned_page.dart';
-import '../../domain/usecases/process_page_usecase.dart';
+import '../../domain/usecases/edit_scan_page_usecase.dart';
 import '../cubit/page_editor_cubit.dart';
 import '../cubit/page_editor_state.dart';
 import '../widgets/filter_selector_bar.dart';
 import 'perspective_crop_screen.dart';
 
-/// Screen for editing an individual document page (Filter, Rotation, Corner Perspective).
+/// Screen for editing an individual document page (Crop, Perspective correction, Rotation, and Filters).
 class PageEditorScreen extends StatelessWidget {
   const PageEditorScreen({
     super.key,
     required this.page,
+    this.editScanPageUseCase,
   });
 
-  final ScannedPage page;
+  final ScanPage page;
+  final EditScanPageUseCase? editScanPageUseCase;
 
   @override
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => PageEditorCubit(
         initialPage: page,
-        processPageUseCase: ProcessPageUseCase(
-          imageProcessingService: sl<ImageProcessingService>(),
-          fileStorageService: sl<FileStorageService>(),
-        ),
+        editScanPageUseCase:
+            editScanPageUseCase ??
+            (sl.isRegistered<EditScanPageUseCase>()
+                ? sl<EditScanPageUseCase>()
+                : EditScanPageUseCase(
+                    imageProcessingService: sl<ImageProcessingService>(),
+                    fileStorageService: sl<FileStorageService>(),
+                  )),
       ),
       child: const _PageEditorView(),
     );
@@ -69,7 +75,9 @@ class _PageEditorView extends StatelessWidget {
                 IconButton(
                   tooltip: 'Reset to Original',
                   icon: const Icon(Icons.undo),
-                  onPressed: state.isProcessing ? null : () => cubit.resetToOriginal(),
+                  onPressed: state.isProcessing
+                      ? null
+                      : () => cubit.resetToOriginal(),
                 ),
               TextButton(
                 onPressed: state.isProcessing
@@ -90,19 +98,20 @@ class _PageEditorView extends StatelessWidget {
           ),
           body: Column(
             children: [
-              // Main Interactive Preview
+              // Main High-Resolution Interactive Preview (pinch-to-zoom & pan)
               Expanded(
                 child: Center(
                   child: Stack(
                     alignment: Alignment.center,
                     children: [
                       InteractiveViewer(
-                        minScale: 0.8,
+                        minScale: 0.5,
                         maxScale: 4.0,
                         child: Image.file(
                           File(state.currentPage.processedImagePath),
                           fit: BoxFit.contain,
-                          // Keyed on path and timestamp so Flutter cache updates immediately
+                          cacheWidth: 1080,
+                          // Keyed on path and filter/rotation to invalidate stale cache instantly
                           key: ValueKey(
                             '${state.currentPage.processedImagePath}_${state.selectedFilter}_${state.currentRotation}',
                           ),
@@ -110,10 +119,14 @@ class _PageEditorView extends StatelessWidget {
                       ),
                       if (state.isProcessing)
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 14,
+                          ),
                           decoration: BoxDecoration(
                             color: Colors.black87,
                             borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.white24),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
@@ -128,8 +141,12 @@ class _PageEditorView extends StatelessWidget {
                               ),
                               SizedBox(width: 12),
                               Text(
-                                'Processing...',
-                                style: TextStyle(color: Colors.white, fontSize: 14),
+                                'Processing in background...',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
                             ],
                           ),
@@ -145,9 +162,12 @@ class _PageEditorView extends StatelessWidget {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // Action icons: Crop / Perspective & Rotate
+                    // Action toolbar: Crop/Perspective, Rotate, and Crop Reset
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 8,
+                      ),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
@@ -157,15 +177,18 @@ class _PageEditorView extends StatelessWidget {
                             onTap: state.isProcessing
                                 ? null
                                 : () async {
-                                    final updatedCorners = await Navigator.push<DocumentCornerPoints>(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (_) => PerspectiveCropScreen(
-                                          page: state.currentPage,
-                                        ),
-                                      ),
-                                    );
-                                    if (updatedCorners != null && context.mounted) {
+                                    final updatedCorners =
+                                        await Navigator.push<CropCorners>(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) =>
+                                                PerspectiveCropScreen(
+                                                  page: state.currentPage,
+                                                ),
+                                          ),
+                                        );
+                                    if (updatedCorners != null &&
+                                        context.mounted) {
                                       cubit.setCorners(updatedCorners);
                                     }
                                   },
@@ -177,15 +200,26 @@ class _PageEditorView extends StatelessWidget {
                                 ? null
                                 : () => cubit.rotateClockwise(),
                           ),
+                          if (state.hasCrop)
+                            _ActionButton(
+                              icon: Icons.refresh,
+                              label: 'Reset Crop',
+                              onTap: state.isProcessing
+                                  ? null
+                                  : () => cubit.resetCrop(),
+                            ),
                         ],
                       ),
                     ),
 
                     const Divider(color: Colors.white12, height: 1),
 
-                    // Filter Options
+                    // 5 Document Visual Filters with B&W intensity option (10.10)
                     FilterSelectorBar(
                       selectedFilter: state.selectedFilter,
+                      bwIntensity: state.bwIntensity,
+                      onBwIntensityChanged: (intensity) =>
+                          cubit.setBwIntensity(intensity),
                       enabled: !state.isProcessing,
                       onFilterSelected: (filter) => cubit.setFilter(filter),
                     ),
@@ -221,7 +255,11 @@ class _ActionButton extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: onTap != null ? Colors.white : Colors.white38, size: 22),
+            Icon(
+              icon,
+              color: onTap != null ? Colors.white : Colors.white38,
+              size: 22,
+            ),
             const SizedBox(height: 4),
             Text(
               label,

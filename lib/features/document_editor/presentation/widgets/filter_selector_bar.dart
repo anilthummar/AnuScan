@@ -8,35 +8,94 @@ class FilterSelectorBar extends StatelessWidget {
     super.key,
     required this.selectedFilter,
     required this.onFilterSelected,
+    this.bwIntensity = BwIntensity.medium,
+    this.onBwIntensityChanged,
     this.enabled = true,
   });
 
-  final DocumentFilterType selectedFilter;
-  final ValueChanged<DocumentFilterType> onFilterSelected;
+  final ScanFilter selectedFilter;
+  final ValueChanged<ScanFilter> onFilterSelected;
+  final BwIntensity bwIntensity;
+  final ValueChanged<BwIntensity>? onBwIntensityChanged;
   final bool enabled;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 90,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: DocumentFilterType.values.length,
-        separatorBuilder: (_, index) => const SizedBox(width: 12),
-        itemBuilder: (context, index) {
-          final filter = DocumentFilterType.values[index];
-          final isSelected = filter == selectedFilter;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (selectedFilter == DocumentFilterType.blackAndWhite &&
+            onBwIntensityChanged != null) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 4.0,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text(
+                  'B&W Intensity: ',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ...BwIntensity.values.map((intensity) {
+                  final isCurrent = intensity == bwIntensity;
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4.0),
+                    child: ChoiceChip(
+                      label: Text(intensity.displayName),
+                      selected: isCurrent,
+                      onSelected: enabled
+                          ? (selected) {
+                              if (selected) onBwIntensityChanged!(intensity);
+                            }
+                          : null,
+                      selectedColor: AppColors.primary,
+                      backgroundColor: Colors.white12,
+                      labelStyle: TextStyle(
+                        color: isCurrent ? Colors.white : Colors.white70,
+                        fontSize: 11,
+                        fontWeight: isCurrent
+                            ? FontWeight.bold
+                            : FontWeight.normal,
+                      ),
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                    ),
+                  );
+                }),
+              ],
+            ),
+          ),
+          const Divider(color: Colors.white12, height: 1),
+        ],
+        Container(
+          height: 90,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: DocumentFilterType.values.length,
+            separatorBuilder: (_, index) => const SizedBox(width: 12),
+            itemBuilder: (context, index) {
+              final filter = DocumentFilterType.values[index];
+              final isSelected = filter == selectedFilter;
 
-          return _FilterOptionItem(
-            filter: filter,
-            isSelected: isSelected,
-            enabled: enabled,
-            onTap: () => onFilterSelected(filter),
-          );
-        },
-      ),
+              return _FilterOptionItem(
+                filter: filter,
+                isSelected: isSelected,
+                enabled: enabled,
+                onTap: () => onFilterSelected(filter),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }

@@ -17,8 +17,8 @@ class PerspectiveCropWidget extends StatefulWidget {
   final String imagePath;
   final int imageWidth;
   final int imageHeight;
-  final DocumentCornerPoints? initialCorners;
-  final ValueChanged<DocumentCornerPoints> onCornersChanged;
+  final CropCorners? initialCorners;
+  final ValueChanged<CropCorners> onCornersChanged;
 
   @override
   State<PerspectiveCropWidget> createState() => _PerspectiveCropWidgetState();
@@ -30,14 +30,65 @@ class _PerspectiveCropWidgetState extends State<PerspectiveCropWidget> {
   late Offset _bl;
   late Offset _br;
 
+  late int _resolvedWidth;
+  late int _resolvedHeight;
+  ImageStream? _imageStream;
+  ImageStreamListener? _imageStreamListener;
+
   @override
   void initState() {
     super.initState();
+    _resolvedWidth = widget.imageWidth;
+    _resolvedHeight = widget.imageHeight;
     _initCorners();
+
+    if (_resolvedWidth <= 0 || _resolvedHeight <= 0) {
+      _resolveImageDimensions();
+    }
+  }
+
+  void _resolveImageDimensions() {
+    final image = FileImage(File(widget.imagePath));
+    _imageStream = image.resolve(ImageConfiguration.empty);
+    _imageStreamListener = ImageStreamListener((info, _) {
+      if (mounted) {
+        setState(() {
+          _resolvedWidth = info.image.width;
+          _resolvedHeight = info.image.height;
+        });
+      }
+      if (_imageStream != null && _imageStreamListener != null) {
+        _imageStream!.removeListener(_imageStreamListener!);
+        _imageStream = null;
+        _imageStreamListener = null;
+      }
+    });
+    _imageStream!.addListener(_imageStreamListener!);
+  }
+
+  @override
+  void dispose() {
+    if (_imageStream != null && _imageStreamListener != null) {
+      _imageStream!.removeListener(_imageStreamListener!);
+      _imageStream = null;
+      _imageStreamListener = null;
+    }
+    super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant PerspectiveCropWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.initialCorners != oldWidget.initialCorners &&
+        widget.initialCorners != null) {
+      setState(() {
+        _initCorners();
+      });
+    }
   }
 
   void _initCorners() {
-    final c = widget.initialCorners ?? DocumentCornerPoints.fullBounds();
+    final c = widget.initialCorners ?? CropCorners.fullBounds();
     _tl = Offset(c.topLeftX, c.topLeftY);
     _tr = Offset(c.topRightX, c.topRightY);
     _bl = Offset(c.bottomLeftX, c.bottomLeftY);
@@ -45,16 +96,18 @@ class _PerspectiveCropWidgetState extends State<PerspectiveCropWidget> {
   }
 
   void _notifyChange() {
-    widget.onCornersChanged(DocumentCornerPoints(
-      topLeftX: _tl.dx,
-      topLeftY: _tl.dy,
-      topRightX: _tr.dx,
-      topRightY: _tr.dy,
-      bottomLeftX: _bl.dx,
-      bottomLeftY: _bl.dy,
-      bottomRightX: _br.dx,
-      bottomRightY: _br.dy,
-    ));
+    widget.onCornersChanged(
+      CropCorners(
+        topLeftX: _tl.dx,
+        topLeftY: _tl.dy,
+        topRightX: _tr.dx,
+        topRightY: _tr.dy,
+        bottomLeftX: _bl.dx,
+        bottomLeftY: _bl.dy,
+        bottomRightX: _br.dx,
+        bottomRightY: _br.dy,
+      ),
+    );
   }
 
   void resetToFullBounds() {
@@ -71,8 +124,8 @@ class _PerspectiveCropWidgetState extends State<PerspectiveCropWidget> {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final imgW = widget.imageWidth > 0 ? widget.imageWidth.toDouble() : 1.0;
-        final imgH = widget.imageHeight > 0 ? widget.imageHeight.toDouble() : 1.0;
+        final imgW = _resolvedWidth > 0 ? _resolvedWidth.toDouble() : 1.0;
+        final imgH = _resolvedHeight > 0 ? _resolvedHeight.toDouble() : 1.0;
         final imageAspect = imgW / imgH;
 
         double renderW;
@@ -95,13 +148,10 @@ class _PerspectiveCropWidgetState extends State<PerspectiveCropWidget> {
               children: [
                 // Underlying source image
                 Positioned.fill(
-                  child: Image.file(
-                    File(widget.imagePath),
-                    fit: BoxFit.fill,
-                  ),
+                  child: Image.file(File(widget.imagePath), fit: BoxFit.fill),
                 ),
 
-                // Quadrilateral polygon overlay & border lines
+                // Quadrilateral polygon overlay & boundary lines
                 Positioned.fill(
                   child: CustomPaint(
                     painter: _PerspectiveOverlayPainter(
@@ -203,8 +253,8 @@ class _PerspectiveCropWidgetState extends State<PerspectiveCropWidget> {
           height: handleSize,
           alignment: Alignment.center,
           child: Container(
-            width: 22,
-            height: 22,
+            width: 24,
+            height: 24,
             decoration: BoxDecoration(
               color: AppColors.cropHandle,
               shape: BoxShape.circle,
@@ -244,7 +294,7 @@ class _PerspectiveOverlayPainter extends CustomPainter {
     final pBl = Offset(bl.dx * size.width, bl.dy * size.height);
     final pBr = Offset(br.dx * size.width, br.dy * size.height);
 
-    // Dark dimmed background
+    // Dark dimmed background outside polygon
     final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
     final polyPath = Path()
       ..moveTo(pTl.dx, pTl.dy)

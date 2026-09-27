@@ -7,9 +7,13 @@ import 'package:anuscan/features/document_history/presentation/cubit/document_hi
 import 'package:anuscan/features/document_history/presentation/cubit/document_history_state.dart';
 
 class MockGetDocumentsUseCase extends Mock implements GetDocumentsUseCase {}
+
 class MockDeleteDocumentUseCase extends Mock implements DeleteDocumentUseCase {}
+
 class MockRenameDocumentUseCase extends Mock implements RenameDocumentUseCase {}
-class MockSearchDocumentsUseCase extends Mock implements SearchDocumentsUseCase {}
+
+class MockSearchDocumentsUseCase extends Mock
+    implements SearchDocumentsUseCase {}
 
 void main() {
   late MockGetDocumentsUseCase mockGetDocumentsUseCase;
@@ -38,9 +42,9 @@ void main() {
   blocTest<DocumentHistoryCubit, DocumentHistoryState>(
     'emits [DocumentHistoryLoading, DocumentHistoryLoaded] when loadDocuments is successful',
     build: () {
-      when(() => mockGetDocumentsUseCase()).thenAnswer((_) async => [
-            createDoc('d1', 'Doc 1'),
-          ]);
+      when(
+        () => mockGetDocumentsUseCase(),
+      ).thenAnswer((_) async => [createDoc('d1', 'Doc 1')]);
       return DocumentHistoryCubit(
         getDocumentsUseCase: mockGetDocumentsUseCase,
         deleteDocumentUseCase: mockDeleteDocumentUseCase,
@@ -51,16 +55,20 @@ void main() {
     act: (cubit) => cubit.loadDocuments(),
     expect: () => [
       const DocumentHistoryLoading(),
-      isA<DocumentHistoryLoaded>().having((s) => s.documents.length, 'length', 1),
+      isA<DocumentHistoryLoaded>().having(
+        (s) => s.documents.length,
+        'length',
+        1,
+      ),
     ],
   );
 
   blocTest<DocumentHistoryCubit, DocumentHistoryState>(
     'emits [DocumentHistoryLoading, DocumentHistoryLoaded] when searchDocuments matches query',
     build: () {
-      when(() => mockSearchDocumentsUseCase('Report')).thenAnswer((_) async => [
-            createDoc('d1', 'Financial Report'),
-          ]);
+      when(
+        () => mockSearchDocumentsUseCase('Report'),
+      ).thenAnswer((_) async => [createDoc('d1', 'Financial Report')]);
       return DocumentHistoryCubit(
         getDocumentsUseCase: mockGetDocumentsUseCase,
         deleteDocumentUseCase: mockDeleteDocumentUseCase,

@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'core/di/injection.dart';
+import 'core/routes/app_router.dart';
+import 'core/routes/app_routes.dart';
 import 'core/theme/app_theme.dart';
-import 'features/document_history/domain/usecases/document_usecases.dart';
 import 'features/document_history/presentation/cubit/document_history_cubit.dart';
-import 'features/document_history/presentation/screens/home_screen.dart';
+import 'features/security/presentation/cubit/app_lock_cubit.dart';
+import 'features/security/presentation/widgets/app_lock_wrapper.dart';
 
-/// Main application widget with global providers, themes, and home route.
+/// Main application widget with global providers, themes, and centralized routing.
 class AnuScanApp extends StatelessWidget {
   const AnuScanApp({super.key});
 
@@ -15,12 +17,10 @@ class AnuScanApp extends StatelessWidget {
     return MultiBlocProvider(
       providers: [
         BlocProvider<DocumentHistoryCubit>(
-          create: (context) => DocumentHistoryCubit(
-            getDocumentsUseCase: sl<GetDocumentsUseCase>(),
-            deleteDocumentUseCase: sl<DeleteDocumentUseCase>(),
-            renameDocumentUseCase: sl<RenameDocumentUseCase>(),
-            searchDocumentsUseCase: sl<SearchDocumentsUseCase>(),
-          ),
+          create: (context) => sl<DocumentHistoryCubit>(),
+        ),
+        BlocProvider<AppLockCubit>(
+          create: (context) => sl<AppLockCubit>(),
         ),
       ],
       child: MaterialApp(
@@ -29,7 +29,11 @@ class AnuScanApp extends StatelessWidget {
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.system,
-        home: const HomeScreen(),
+        initialRoute: AppRoutes.home,
+        onGenerateRoute: AppRouter.onGenerateRoute,
+        builder: (context, child) => AppLockWrapper(
+          child: child ?? const SizedBox.shrink(),
+        ),
       ),
     );
   }

@@ -12,19 +12,31 @@ abstract class Failure extends Equatable {
 }
 
 class ScannerFailure extends Failure {
-  const ScannerFailure([super.message = 'Document scanning failed or was cancelled', super.cause]);
+  const ScannerFailure([
+    super.message = 'Document scanning failed or was cancelled',
+    super.cause,
+  ]);
 }
 
 class StorageFailure extends Failure {
-  const StorageFailure([super.message = 'Storage operation failed', super.cause]);
+  const StorageFailure([
+    super.message = 'Storage operation failed',
+    super.cause,
+  ]);
 }
 
 class ImageProcessingFailure extends Failure {
-  const ImageProcessingFailure([super.message = 'Image processing operation failed', super.cause]);
+  const ImageProcessingFailure([
+    super.message = 'Image processing operation failed',
+    super.cause,
+  ]);
 }
 
 class PdfGenerationFailure extends Failure {
-  const PdfGenerationFailure([super.message = 'PDF compilation failed', super.cause]);
+  const PdfGenerationFailure([
+    super.message = 'PDF compilation failed',
+    super.cause,
+  ]);
 }
 
 class ShareFailure extends Failure {
@@ -32,9 +44,19 @@ class ShareFailure extends Failure {
 }
 
 class AppDatabaseFailure extends Failure {
-  const AppDatabaseFailure([super.message = 'Database operation failed', super.cause]);
+  const AppDatabaseFailure([
+    super.message = 'Database operation failed',
+    super.cause,
+  ]);
 }
 
 class PermissionFailure extends Failure {
-  const PermissionFailure([super.message = 'Required permission was denied', super.cause]);
+  const PermissionFailure([
+    super.message = 'Required permission was denied',
+    super.cause,
+  ]);
+}
+
+class ValidationFailure extends Failure {
+  const ValidationFailure([super.message = 'Validation failed', super.cause]);
 }

@@ -19,7 +19,8 @@ class ReorderPagesUseCase {
 
     // Re-index all pages
     return [
-      for (int i = 0; i < updated.length; i++) updated[i].copyWith(pageIndex: i),
+      for (int i = 0; i < updated.length; i++)
+        updated[i].copyWith(pageIndex: i),
     ];
   }
 }

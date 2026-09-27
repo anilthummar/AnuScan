@@ -7,6 +7,9 @@ import 'package:anuscan/features/document_history/domain/entities/document_entit
 
 class MockDocumentRepository implements DocumentRepository {
   @override
+  dynamic noSuchMethod(Invocation invocation) => null;
+
+  @override
   Future<List<DocumentEntity>> getAllDocuments() async => [];
 
   @override
@@ -27,12 +30,15 @@ class MockDocumentRepository implements DocumentRepository {
 
 void main() {
   setUp(() async {
+    await sl.reset();
     await setupDependencyInjection(
       customDocumentRepository: MockDocumentRepository(),
     );
   });
 
-  testWidgets('AnuScanApp renders HomeScreen successfully', (WidgetTester tester) async {
+  testWidgets('AnuScanApp renders HomeScreen successfully', (
+    WidgetTester tester,
+  ) async {
     await tester.pumpWidget(const AnuScanApp());
     await tester.pump();
 

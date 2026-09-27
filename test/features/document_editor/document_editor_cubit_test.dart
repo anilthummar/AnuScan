@@ -7,7 +7,10 @@ import 'package:anuscan/features/document_editor/domain/usecases/reorder_pages_u
 import 'package:anuscan/features/document_editor/presentation/cubit/document_editor_cubit.dart';
 
 class MockFileStorageService extends Mock implements FileStorageService {}
-class MockImageProcessingService extends Mock implements ImageProcessingService {}
+
+class MockImageProcessingService extends Mock
+    implements ImageProcessingService {}
+
 class MockProcessPageUseCase extends Mock implements ProcessPageUseCase {}
 
 void main() {
@@ -21,11 +24,20 @@ void main() {
     mockImageService = MockImageProcessingService();
     mockProcessPageUseCase = MockProcessPageUseCase();
 
-    when(() => mockStorageService.copyImageFile(any(), any(), filename: any(named: 'filename')))
-        .thenAnswer((invocation) async => '/app_storage/doc_1/${invocation.namedArguments[#filename]}');
+    when(
+      () => mockStorageService.copyImageFile(
+        any(),
+        any(),
+        filename: any(named: 'filename'),
+      ),
+    ).thenAnswer(
+      (invocation) async =>
+          '/app_storage/doc_1/${invocation.namedArguments[#filename]}',
+    );
 
-    when(() => mockImageService.getImageDimensions(any()))
-        .thenAnswer((_) async => (1080, 1920));
+    when(
+      () => mockImageService.getImageDimensions(any()),
+    ).thenAnswer((_) async => (1080, 1920));
 
     cubit = DocumentEditorCubit(
       fileStorageService: mockStorageService,
@@ -58,7 +70,11 @@ void main() {
   });
 
   test('deletePage removes page and adjusts indices', () async {
-    await cubit.addImages(['/tmp/page1.jpg', '/tmp/page2.jpg', '/tmp/page3.jpg']);
+    await cubit.addImages([
+      '/tmp/page1.jpg',
+      '/tmp/page2.jpg',
+      '/tmp/page3.jpg',
+    ]);
     expect(cubit.state.pages.length, equals(3));
 
     cubit.deletePage(1);
@@ -66,6 +82,49 @@ void main() {
     expect(cubit.state.pages.length, equals(2));
     expect(cubit.state.pages[0].pageIndex, equals(0));
     expect(cubit.state.pages[1].pageIndex, equals(1));
+  });
+
+  test('reorderPages delegates to use case and normalizes order', () async {
+    await cubit.addImages([
+      '/tmp/page1.jpg',
+      '/tmp/page2.jpg',
+      '/tmp/page3.jpg',
+    ]);
+    final p1Id = cubit.state.pages[0].id;
+    final p2Id = cubit.state.pages[1].id;
+
+    cubit.reorderPages(0, 2);
+
+    expect(cubit.state.pages[0].id, equals(p2Id));
+    expect(cubit.state.pages[1].id, equals(p1Id));
+    expect(cubit.state.pages[0].pageIndex, equals(0));
+    expect(cubit.state.pages[1].pageIndex, equals(1));
+  });
+
+  test('duplicatePage duplicates page files and reindexes sequence', () async {
+    await cubit.addImages(['/tmp/page1.jpg', '/tmp/page2.jpg']);
+
+    await cubit.duplicatePage(0);
+
+    expect(cubit.state.pages.length, equals(3));
+    expect(cubit.state.pages[0].pageIndex, equals(0));
+    expect(cubit.state.pages[1].pageIndex, equals(1));
+    expect(cubit.state.pages[2].pageIndex, equals(2));
+    expect(cubit.state.pages[1].id, isNot(equals(cubit.state.pages[0].id)));
+  });
+
+  test('toSession produces a valid DocumentSession domain object', () async {
+    await cubit.addImages(['/tmp/page1.jpg']);
+
+    final session = cubit.toSession();
+
+    expect(session.id, equals('doc_1'));
+    expect(session.name, equals('Test Document'));
+    expect(session.pageCount, equals(1));
+    expect(
+      session.pages.first.imagePath,
+      equals(cubit.state.pages.first.processedImagePath),
+    );
   });
 
   test('updateTitle sanitizes and updates document title', () {

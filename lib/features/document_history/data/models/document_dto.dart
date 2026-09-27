@@ -1,6 +1,8 @@
 import '../../domain/entities/document_entity.dart';
+import '../../domain/entities/tag_entity.dart';
 import '../../../document_editor/domain/entities/scanned_page.dart';
 import '../../../../core/services/image_processing_service.dart';
+import 'tag_dto.dart';
 
 class DocumentDto {
   const DocumentDto({
@@ -12,6 +14,15 @@ class DocumentDto {
     this.fileSizeBytes = 0,
     required this.createdAt,
     required this.updatedAt,
+    this.isFavorite = false,
+    this.isArchived = false,
+    this.isDeleted = false,
+    this.isPrivate = false,
+    this.deletedAt,
+    this.folderId,
+    this.folderName,
+    this.lastOpenedAt,
+    this.tags = const [],
   });
 
   final String id;
@@ -22,6 +33,15 @@ class DocumentDto {
   final int fileSizeBytes;
   final int createdAt; // epoch ms
   final int updatedAt; // epoch ms
+  final bool isFavorite;
+  final bool isArchived;
+  final bool isDeleted;
+  final bool isPrivate;
+  final int? deletedAt; // epoch ms
+  final String? folderId;
+  final String? folderName;
+  final int? lastOpenedAt; // epoch ms
+  final List<TagDto> tags;
 
   Map<String, dynamic> toMap() {
     return {
@@ -33,10 +53,21 @@ class DocumentDto {
       'file_size_bytes': fileSizeBytes,
       'created_at': createdAt,
       'updated_at': updatedAt,
+      'is_favorite': isFavorite ? 1 : 0,
+      'is_archived': isArchived ? 1 : 0,
+      'is_deleted': isDeleted ? 1 : 0,
+      'is_private': isPrivate ? 1 : 0,
+      'deleted_at': deletedAt,
+      'folder_id': folderId,
+      'last_opened_at': lastOpenedAt,
     };
   }
 
-  factory DocumentDto.fromMap(Map<String, dynamic> map) {
+  factory DocumentDto.fromMap(
+    Map<String, dynamic> map, {
+    String? folderName,
+    List<TagDto> tags = const [],
+  }) {
     return DocumentDto(
       id: map['id'] as String,
       title: map['title'] as String,
@@ -46,6 +77,15 @@ class DocumentDto {
       fileSizeBytes: (map['file_size_bytes'] as num?)?.toInt() ?? 0,
       createdAt: (map['created_at'] as num).toInt(),
       updatedAt: (map['updated_at'] as num).toInt(),
+      isFavorite: (map['is_favorite'] as num?)?.toInt() == 1,
+      isArchived: (map['is_archived'] as num?)?.toInt() == 1,
+      isDeleted: (map['is_deleted'] as num?)?.toInt() == 1,
+      isPrivate: (map['is_private'] as num?)?.toInt() == 1,
+      deletedAt: (map['deleted_at'] as num?)?.toInt(),
+      folderId: map['folder_id'] as String?,
+      folderName: folderName ?? map['folder_name'] as String?,
+      lastOpenedAt: (map['last_opened_at'] as num?)?.toInt(),
+      tags: tags,
     );
   }
 
@@ -59,10 +99,22 @@ class DocumentDto {
       fileSizeBytes: entity.fileSizeBytes,
       createdAt: entity.createdAt.millisecondsSinceEpoch,
       updatedAt: entity.updatedAt.millisecondsSinceEpoch,
+      isFavorite: entity.isFavorite,
+      isArchived: entity.isArchived,
+      isDeleted: entity.isDeleted,
+      isPrivate: entity.isPrivate,
+      deletedAt: entity.deletedAt?.millisecondsSinceEpoch,
+      folderId: entity.folderId,
+      folderName: entity.folderName,
+      lastOpenedAt: entity.lastOpenedAt?.millisecondsSinceEpoch,
+      tags: entity.tags.map((t) => TagDto.fromEntity(t)).toList(),
     );
   }
 
-  DocumentEntity toEntity({List<ScannedPage> pages = const []}) {
+  DocumentEntity toEntity({
+    List<ScannedPage> pages = const [],
+    List<TagEntity>? overrideTags,
+  }) {
     return DocumentEntity(
       id: id,
       title: title,
@@ -73,6 +125,19 @@ class DocumentDto {
       createdAt: DateTime.fromMillisecondsSinceEpoch(createdAt),
       updatedAt: DateTime.fromMillisecondsSinceEpoch(updatedAt),
       pages: pages,
+      isFavorite: isFavorite,
+      isArchived: isArchived,
+      isDeleted: isDeleted,
+      isPrivate: isPrivate,
+      deletedAt: deletedAt != null
+          ? DateTime.fromMillisecondsSinceEpoch(deletedAt!)
+          : null,
+      folderId: folderId,
+      folderName: folderName,
+      lastOpenedAt: lastOpenedAt != null
+          ? DateTime.fromMillisecondsSinceEpoch(lastOpenedAt!)
+          : null,
+      tags: overrideTags ?? tags.map((t) => t.toEntity()).toList(),
     );
   }
 }

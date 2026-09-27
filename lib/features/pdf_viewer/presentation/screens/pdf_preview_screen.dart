@@ -3,21 +3,25 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:printing/printing.dart' hide PdfPreviewState;
 import '../../../../core/di/injection.dart';
-import '../../../../core/services/file_storage_service.dart';
-import '../../../../core/services/image_processing_service.dart';
+import '../../../../core/routes/app_router.dart';
+import '../../../../core/routes/app_routes.dart';
 import '../../../../core/services/pdf_generator_service.dart';
-import '../../../../core/services/share_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/file_utils.dart';
 import '../../../document_editor/domain/entities/scanned_page.dart';
-import '../../../document_history/domain/repositories/document_repository.dart';
 import '../../../document_history/domain/usecases/document_usecases.dart';
+import '../../../smart_document/domain/usecases/smart_document_usecases.dart';
+import '../../../smart_document/presentation/cubit/smart_document_cubit.dart';
+import '../../../smart_document/presentation/widgets/smart_document_card.dart';
+import '../../domain/usecases/delete_pdf_usecase.dart';
 import '../../domain/usecases/generate_pdf_usecase.dart';
+import '../../domain/usecases/rename_pdf_usecase.dart';
 import '../../domain/usecases/share_pdf_usecase.dart';
 import '../cubit/pdf_preview_cubit.dart';
 import '../cubit/pdf_preview_state.dart';
 
-/// Screen for previewing generated PDF, changing page formats, renaming, and sharing.
+/// Screen for previewing generated PDF, changing page formats, renaming, sharing,
+/// opening with external applications, saving, and deleting documents.
 class PdfPreviewScreen extends StatelessWidget {
   const PdfPreviewScreen({
     super.key,
@@ -25,40 +29,87 @@ class PdfPreviewScreen extends StatelessWidget {
     required this.title,
     required this.pages,
     this.existingPdfPath,
+    this.customCubit,
   });
 
   final String documentId;
   final String title;
   final List<ScannedPage> pages;
   final String? existingPdfPath;
+  final PdfPreviewCubit? customCubit;
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      create: (context) {
-        final cubit = PdfPreviewCubit(
-          generatePdfUseCase: GeneratePdfUseCase(
-            pdfGeneratorService: sl<PdfGeneratorService>(),
-            fileStorageService: sl<FileStorageService>(),
-            imageProcessingService: sl<ImageProcessingService>(),
-          ),
-          sharePdfUseCase: SharePdfUseCase(sl<ShareService>()),
-          saveDocumentUseCase: SaveDocumentUseCase(sl<DocumentRepository>()),
-          documentId: documentId,
-          title: title,
-          pages: pages,
-        );
-        cubit.compilePdf();
-        return cubit;
-      },
-      child: _PdfPreviewView(pagesCount: pages.length),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<PdfPreviewCubit>(
+          create: (context) {
+            if (customCubit != null) return customCubit!;
+            final cubit = sl.isRegistered<PdfPreviewCubit>()
+                ? sl<PdfPreviewCubit>(
+                    param1: PdfPreviewArgs(
+                      documentId: documentId,
+                      title: title,
+                      pages: pages,
+                      existingPdfPath: existingPdfPath,
+                    ),
+                  )
+                : PdfPreviewCubit(
+                    generatePdfUseCase: sl<GeneratePdfUseCase>(),
+                    sharePdfUseCase: sl<SharePdfUseCase>(),
+                    saveDocumentUseCase: sl<SaveDocumentUseCase>(),
+                    renamePdfUseCase: sl<RenamePdfUseCase>(),
+                    deletePdfUseCase: sl<DeletePdfUseCase>(),
+                    documentId: documentId,
+                    title: title,
+                    pages: pages,
+                    existingPdfPath: existingPdfPath,
+                  );
+            if (existingPdfPath == null ||
+                !File(existingPdfPath!).existsSync()) {
+              cubit.compilePdf();
+            }
+            return cubit;
+          },
+        ),
+        BlocProvider<SmartDocumentCubit>(
+          create: (context) {
+            final cubit = sl.isRegistered<SmartDocumentCubit>()
+                ? sl<SmartDocumentCubit>()
+                : SmartDocumentCubit(
+                    recognizeDocumentUseCase: sl<RecognizeDocumentUseCase>(),
+                    getDocumentRecognitionUseCase:
+                        sl<GetDocumentRecognitionUseCase>(),
+                    overrideDocumentTypeUseCase:
+                        sl<OverrideDocumentTypeUseCase>(),
+                    updateDocumentMetadataUseCase:
+                        sl<UpdateDocumentMetadataUseCase>(),
+                    suggestDocumentNameUseCase:
+                        sl<SuggestDocumentNameUseCase>(),
+                  );
+            cubit.loadOrRecognize(documentId: documentId, pages: pages);
+            return cubit;
+          },
+        ),
+      ],
+      child: _PdfPreviewView(
+        documentId: documentId,
+        pages: pages,
+        pagesCount: pages.length,
+      ),
     );
   }
 }
 
 class _PdfPreviewView extends StatelessWidget {
-  const _PdfPreviewView({required this.pagesCount});
+  const _PdfPreviewView({
+    required this.documentId,
+    required this.pages,
+    required this.pagesCount,
+  });
 
+  final String documentId;
+  final List<ScannedPage> pages;
   final int pagesCount;
 
   void _showRenameDialog(BuildContext context, String currentTitle) {
@@ -95,6 +146,35 @@ class _PdfPreviewView extends StatelessWidget {
     );
   }
 
+  void _showDeleteDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete Document'),
+        content: const Text(
+          'Are you sure you want to permanently delete this document and all its scanned pages? This action cannot be undone.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              foregroundColor: Colors.white,
+            ),
+            onPressed: () {
+              Navigator.pop(dialogContext);
+              context.read<PdfPreviewCubit>().deletePdf();
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocConsumer<PdfPreviewCubit, PdfPreviewState>(
@@ -106,6 +186,17 @@ class _PdfPreviewView extends StatelessWidget {
               backgroundColor: AppColors.error,
             ),
           );
+        } else if (state.successMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.successMessage!),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+
+        if (state.isDeleted) {
+          Navigator.of(context).popUntil((route) => route.isFirst);
         }
       },
       builder: (context, state) {
@@ -124,7 +215,10 @@ class _PdfPreviewView extends StatelessWidget {
                     Flexible(
                       child: Text(
                         state.title,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -135,16 +229,84 @@ class _PdfPreviewView extends StatelessWidget {
               ),
             ),
             actions: [
+              // Open with external application
+              IconButton(
+                tooltip: 'Open with external app',
+                icon: state.isOpeningExternal
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.open_in_new),
+                onPressed:
+                    (state.pdfPath != null &&
+                        !state.isOpeningExternal &&
+                        !state.isGenerating)
+                    ? () => cubit.openExternal()
+                    : null,
+              ),
+
+              // Extract text (OCR)
+              IconButton(
+                tooltip: 'Extract Text (OCR)',
+                icon: const Icon(Icons.document_scanner_outlined),
+                onPressed: pages.isEmpty || state.isGenerating
+                    ? null
+                    : () {
+                        Navigator.pushNamed(
+                          context,
+                          AppRoutes.ocrViewer,
+                          arguments: OcrViewerArgs(
+                            documentId: documentId,
+                            title: state.title,
+                            pages: pages,
+                          ),
+                        );
+                      },
+              ),
+
+              // Share PDF
               IconButton(
                 tooltip: 'Share PDF',
-                icon: const Icon(Icons.share, color: AppColors.primary),
-                onPressed: state.pdfPath != null ? () => cubit.sharePdf() : null,
+                icon: state.isSharing
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.share, color: AppColors.primary),
+                onPressed:
+                    (state.pdfPath != null &&
+                        !state.isSharing &&
+                        !state.isGenerating)
+                    ? () => cubit.sharePdf()
+                    : null,
               ),
+
+              // Delete document
+              IconButton(
+                tooltip: 'Delete document',
+                icon: state.isDeleting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.error,
+                        ),
+                      )
+                    : const Icon(Icons.delete_outline, color: AppColors.error),
+                onPressed: !state.isDeleting && !state.isGenerating
+                    ? () => _showDeleteDialog(context)
+                    : null,
+              ),
+
+              // Done
               IconButton(
                 tooltip: 'Done',
                 icon: const Icon(Icons.check),
                 onPressed: () {
-                  // Return to home root
                   Navigator.of(context).popUntil((route) => route.isFirst);
                 },
               ),
@@ -152,10 +314,26 @@ class _PdfPreviewView extends StatelessWidget {
           ),
           body: Column(
             children: [
+              // Smart Document Recognition Banner
+              SmartDocumentCard(
+                currentTitle: state.title,
+                onApplyName: (newName) {
+                  cubit.renameDocument(newName);
+                },
+                onEditName: () => _showRenameDialog(context, state.title),
+              ),
+
               // PDF Viewer Canvas
               Expanded(
-                child: state.isGenerating || state.pdfPath == null
-                    ? const Center(
+                child: BlocBuilder<PdfPreviewCubit, PdfPreviewState>(
+                  buildWhen: (prev, curr) =>
+                      prev.pdfPath != curr.pdfPath ||
+                      prev.isGenerating != curr.isGenerating ||
+                      prev.title != curr.title,
+                  builder: (context, previewState) {
+                    if (previewState.isGenerating ||
+                        previewState.pdfPath == null) {
+                      return const Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
@@ -167,21 +345,30 @@ class _PdfPreviewView extends StatelessWidget {
                             ),
                           ],
                         ),
-                      )
-                    : PdfPreview(
-                        build: (format) async => await File(state.pdfPath!).readAsBytes(),
-                        canChangeOrientation: false,
-                        canChangePageFormat: false,
-                        canDebug: false,
-                        allowPrinting: true,
-                        allowSharing: false, // Handled through our ShareService
-                        pdfFileName: '${FileUtils.sanitizeFileName(state.title)}.pdf',
-                      ),
+                      );
+                    }
+                    return PdfPreview(
+                      build: (format) async =>
+                          await File(previewState.pdfPath!).readAsBytes(),
+                      canChangeOrientation: false,
+                      canChangePageFormat: false,
+                      canDebug: false,
+                      allowPrinting: true,
+                      allowSharing:
+                          false, // Handled through native AnuScan ShareService
+                      pdfFileName:
+                          '${FileUtils.sanitizeFileName(previewState.title)}.pdf',
+                    );
+                  },
+                ),
               ),
 
               // Bottom Info and Page Format Bar
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
                   border: const Border(
@@ -199,14 +386,24 @@ class _PdfPreviewView extends StatelessWidget {
                           children: [
                             Row(
                               children: [
-                                const Icon(Icons.check_circle, size: 16, color: AppColors.success),
+                                Icon(
+                                  state.isSaved
+                                      ? Icons.check_circle
+                                      : Icons.info_outline,
+                                  size: 16,
+                                  color: state.isSaved
+                                      ? AppColors.success
+                                      : AppColors.textSecondaryLight,
+                                ),
                                 const SizedBox(width: 6),
                                 Text(
-                                  state.isSaved ? 'Saved Locally' : 'Ready',
-                                  style: const TextStyle(
+                                  state.isSaved ? 'Saved Locally' : 'Unsaved',
+                                  style: TextStyle(
                                     fontSize: 13,
                                     fontWeight: FontWeight.w600,
-                                    color: AppColors.success,
+                                    color: state.isSaved
+                                        ? AppColors.success
+                                        : AppColors.textSecondaryLight,
                                   ),
                                 ),
                               ],
@@ -223,21 +420,54 @@ class _PdfPreviewView extends StatelessWidget {
                         ),
                       ),
 
+                      // Manual Save Action Button
+                      if (!state.isSaved) ...[
+                        OutlinedButton.icon(
+                          onPressed: (!state.isSaving && state.pdfPath != null)
+                              ? () => cubit.savePdf()
+                              : null,
+                          icon: state.isSaving
+                              ? const SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.save_alt, size: 16),
+                          label: const Text('Save'),
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 6,
+                            ),
+                            textStyle: const TextStyle(fontSize: 12),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                      ],
+
                       // Page Size Format Selector Dropdown
                       DropdownButton<PdfPageSizeOption>(
                         value: state.pageSize,
                         underline: const SizedBox.shrink(),
-                        icon: const Icon(Icons.arrow_drop_down, color: AppColors.primary),
+                        icon: const Icon(
+                          Icons.arrow_drop_down,
+                          color: AppColors.primary,
+                        ),
                         items: PdfPageSizeOption.values.map((option) {
                           return DropdownMenuItem(
                             value: option,
                             child: Text(
                               option.displayName,
-                              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+                              style: const TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
+                              ),
                             ),
                           );
                         }).toList(),
-                        onChanged: state.isGenerating
+                        onChanged: (state.isGenerating || state.isDeleting)
                             ? null
                             : (newSize) {
                                 if (newSize != null) {

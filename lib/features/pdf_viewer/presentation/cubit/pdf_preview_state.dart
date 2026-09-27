@@ -10,8 +10,14 @@ class PdfPreviewState extends Equatable {
     this.fileSizeBytes = 0,
     this.pageSize = PdfPageSizeOption.a4,
     this.isGenerating = false,
+    this.isSaving = false,
     this.isSaved = false,
+    this.isSharing = false,
+    this.isOpeningExternal = false,
+    this.isDeleting = false,
+    this.isDeleted = false,
     this.errorMessage,
+    this.successMessage,
   });
 
   final String documentId;
@@ -21,8 +27,14 @@ class PdfPreviewState extends Equatable {
   final int fileSizeBytes;
   final PdfPageSizeOption pageSize;
   final bool isGenerating;
+  final bool isSaving;
   final bool isSaved;
+  final bool isSharing;
+  final bool isOpeningExternal;
+  final bool isDeleting;
+  final bool isDeleted;
   final String? errorMessage;
+  final String? successMessage;
 
   PdfPreviewState copyWith({
     String? documentId,
@@ -32,9 +44,16 @@ class PdfPreviewState extends Equatable {
     int? fileSizeBytes,
     PdfPageSizeOption? pageSize,
     bool? isGenerating,
+    bool? isSaving,
     bool? isSaved,
+    bool? isSharing,
+    bool? isOpeningExternal,
+    bool? isDeleting,
+    bool? isDeleted,
     String? errorMessage,
+    String? successMessage,
     bool clearError = false,
+    bool clearSuccess = false,
   }) {
     return PdfPreviewState(
       documentId: documentId ?? this.documentId,
@@ -44,21 +63,35 @@ class PdfPreviewState extends Equatable {
       fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
       pageSize: pageSize ?? this.pageSize,
       isGenerating: isGenerating ?? this.isGenerating,
+      isSaving: isSaving ?? this.isSaving,
       isSaved: isSaved ?? this.isSaved,
+      isSharing: isSharing ?? this.isSharing,
+      isOpeningExternal: isOpeningExternal ?? this.isOpeningExternal,
+      isDeleting: isDeleting ?? this.isDeleting,
+      isDeleted: isDeleted ?? this.isDeleted,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
+      successMessage: clearSuccess
+          ? null
+          : (successMessage ?? this.successMessage),
     );
   }
 
   @override
   List<Object?> get props => [
-        documentId,
-        title,
-        pdfPath,
-        thumbnailPath,
-        fileSizeBytes,
-        pageSize,
-        isGenerating,
-        isSaved,
-        errorMessage,
-      ];
+    documentId,
+    title,
+    pdfPath,
+    thumbnailPath,
+    fileSizeBytes,
+    pageSize,
+    isGenerating,
+    isSaving,
+    isSaved,
+    isSharing,
+    isOpeningExternal,
+    isDeleting,
+    isDeleted,
+    errorMessage,
+    successMessage,
+  ];
 }

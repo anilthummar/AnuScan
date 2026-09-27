@@ -4,7 +4,7 @@ import '../../../../core/services/image_processing_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../domain/entities/scanned_page.dart';
 
-/// Reorderable list of scanned pages with individual card controls.
+/// Reorderable list of scanned pages with individual card controls and drag-and-drop.
 class ReorderablePageGrid extends StatelessWidget {
   const ReorderablePageGrid({
     super.key,
@@ -13,6 +13,7 @@ class ReorderablePageGrid extends StatelessWidget {
     required this.onTapPage,
     required this.onRotatePage,
     required this.onDeletePage,
+    this.onDuplicatePage,
   });
 
   final List<ScannedPage> pages;
@@ -20,6 +21,7 @@ class ReorderablePageGrid extends StatelessWidget {
   final ValueChanged<int> onTapPage;
   final ValueChanged<int> onRotatePage;
   final ValueChanged<int> onDeletePage;
+  final ValueChanged<int>? onDuplicatePage;
 
   @override
   Widget build(BuildContext context) {
@@ -28,7 +30,11 @@ class ReorderablePageGrid extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.description_outlined, size: 64, color: AppColors.textTertiaryLight),
+            const Icon(
+              Icons.description_outlined,
+              size: 64,
+              color: AppColors.textTertiaryLight,
+            ),
             const SizedBox(height: 16),
             const Text(
               'No pages in this document yet',
@@ -37,7 +43,10 @@ class ReorderablePageGrid extends StatelessWidget {
             const SizedBox(height: 8),
             const Text(
               'Tap the buttons below to scan or import pages',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondaryLight),
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondaryLight,
+              ),
             ),
           ],
         ),
@@ -57,6 +66,9 @@ class ReorderablePageGrid extends StatelessWidget {
           onTap: () => onTapPage(index),
           onRotate: () => onRotatePage(index),
           onDelete: () => onDeletePage(index),
+          onDuplicate: onDuplicatePage != null
+              ? () => onDuplicatePage!(index)
+              : null,
         );
       },
     );
@@ -71,6 +83,7 @@ class _PageCard extends StatelessWidget {
     required this.onTap,
     required this.onRotate,
     required this.onDelete,
+    this.onDuplicate,
   });
 
   final ScannedPage page;
@@ -78,6 +91,7 @@ class _PageCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onRotate;
   final VoidCallback onDelete;
+  final VoidCallback? onDuplicate;
 
   @override
   Widget build(BuildContext context) {
@@ -85,6 +99,14 @@ class _PageCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(
+          color: AppColors.borderLight.withValues(alpha: 0.6),
+          width: 1,
+        ),
+      ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
@@ -92,35 +114,37 @@ class _PageCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              // Page Number Badge & Drag handle indicator
+              // Page Number Badge & Drag handle indicator: [ Page 1 ]
               Column(
                 children: [
                   Container(
-                    width: 28,
-                    height: 28,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary,
                       borderRadius: BorderRadius.circular(6),
                     ),
                     alignment: Alignment.center,
                     child: Text(
-                      '${index + 1}',
+                      'Page ${index + 1}',
                       style: const TextStyle(
                         color: Colors.white,
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
+                        fontSize: 12,
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 10),
                   const Icon(
                     Icons.drag_handle,
                     color: AppColors.textTertiaryLight,
-                    size: 20,
+                    size: 22,
                   ),
                 ],
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
 
               // Page Thumbnail
               ClipRRect(
@@ -132,11 +156,14 @@ class _PageCard extends StatelessWidget {
                   child: Image.file(
                     File(page.processedImagePath),
                     fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image),
+                    cacheWidth: 150,
+                    cacheHeight: 200,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const Icon(Icons.broken_image),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 14),
 
               // Page Details & Quick Info
               Expanded(
@@ -144,9 +171,9 @@ class _PageCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      'Page ${index + 1}',
+                      '[ Page ${index + 1} ]',
                       style: const TextStyle(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         fontSize: 15,
                       ),
                     ),
@@ -155,7 +182,9 @@ class _PageCard extends StatelessWidget {
                       'Filter: ${page.filterType.displayName}',
                       style: TextStyle(
                         fontSize: 13,
-                        color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.7),
+                        color: theme.textTheme.bodyMedium?.color?.withValues(
+                          alpha: 0.7,
+                        ),
                       ),
                     ),
                     if (page.rotationDegrees > 0)
@@ -163,27 +192,43 @@ class _PageCard extends StatelessWidget {
                         'Rotated: ${page.rotationDegrees}°',
                         style: TextStyle(
                           fontSize: 12,
-                          color: theme.textTheme.bodyMedium?.color?.withValues(alpha: 0.6),
+                          color: theme.textTheme.bodyMedium?.color?.withValues(
+                            alpha: 0.6,
+                          ),
                         ),
                       ),
                   ],
                 ),
               ),
 
-              // Action Buttons: Edit, Rotate, Delete
+              // Action Buttons: Edit, Duplicate, Rotate, Delete
               IconButton(
                 tooltip: 'Edit Page',
-                icon: const Icon(Icons.tune, color: AppColors.primary),
+                icon: const Icon(
+                  Icons.tune,
+                  color: AppColors.primary,
+                  size: 20,
+                ),
                 onPressed: onTap,
               ),
+              if (onDuplicate != null)
+                IconButton(
+                  tooltip: 'Duplicate Page',
+                  icon: const Icon(Icons.copy_outlined, size: 20),
+                  onPressed: onDuplicate,
+                ),
               IconButton(
                 tooltip: 'Rotate 90°',
-                icon: const Icon(Icons.rotate_right),
+                icon: const Icon(Icons.rotate_right, size: 22),
                 onPressed: onRotate,
               ),
               IconButton(
                 tooltip: 'Delete Page',
-                icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                icon: const Icon(
+                  Icons.delete_outline,
+                  color: AppColors.error,
+                  size: 20,
+                ),
                 onPressed: onDelete,
               ),
             ],

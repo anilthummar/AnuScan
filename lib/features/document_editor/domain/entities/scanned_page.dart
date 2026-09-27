@@ -29,6 +29,11 @@ class ScannedPage extends Equatable {
   final int height;
   final DateTime createdAt;
 
+  int get order => pageIndex;
+  int get rotation => rotationDegrees;
+  DocumentFilterType get filter => filterType;
+  String get imagePath => processedImagePath;
+
   ScannedPage copyWith({
     String? id,
     String? documentId,
@@ -59,16 +64,19 @@ class ScannedPage extends Equatable {
 
   @override
   List<Object?> get props => [
-        id,
-        documentId,
-        pageIndex,
-        originalImagePath,
-        processedImagePath,
-        filterType,
-        rotationDegrees,
-        corners,
-        width,
-        height,
-        createdAt,
-      ];
+    id,
+    documentId,
+    pageIndex,
+    originalImagePath,
+    processedImagePath,
+    filterType,
+    rotationDegrees,
+    corners,
+    width,
+    height,
+    createdAt,
+  ];
 }
+
+/// Domain model alias for [ScannedPage] satisfying ScanPage specification.
+typedef ScanPage = ScannedPage;

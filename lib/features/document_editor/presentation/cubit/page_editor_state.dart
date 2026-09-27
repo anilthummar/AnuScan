@@ -2,30 +2,38 @@ import 'package:equatable/equatable.dart';
 import '../../../../core/services/image_processing_service.dart';
 import '../../domain/entities/scanned_page.dart';
 
+/// State representation for the [PageEditorCubit].
 class PageEditorState extends Equatable {
   const PageEditorState({
     required this.currentPage,
     required this.selectedFilter,
     required this.currentRotation,
     this.currentCorners,
+    this.bwIntensity = BwIntensity.medium,
     this.isProcessing = false,
     this.hasUnsavedChanges = false,
     this.errorMessage,
   });
 
-  final ScannedPage currentPage;
-  final DocumentFilterType selectedFilter;
+  final ScanPage currentPage;
+  final ScanFilter selectedFilter;
   final int currentRotation;
-  final DocumentCornerPoints? currentCorners;
+  final CropCorners? currentCorners;
+  final BwIntensity bwIntensity;
   final bool isProcessing;
   final bool hasUnsavedChanges;
   final String? errorMessage;
 
+  bool get canReset => hasUnsavedChanges;
+  bool get isRotated => currentRotation != 0;
+  bool get hasCrop => currentCorners != null && !currentCorners!.isFullBounds;
+
   PageEditorState copyWith({
-    ScannedPage? currentPage,
-    DocumentFilterType? selectedFilter,
+    ScanPage? currentPage,
+    ScanFilter? selectedFilter,
     int? currentRotation,
-    DocumentCornerPoints? currentCorners,
+    CropCorners? currentCorners,
+    BwIntensity? bwIntensity,
     bool? isProcessing,
     bool? hasUnsavedChanges,
     String? errorMessage,
@@ -36,7 +44,10 @@ class PageEditorState extends Equatable {
       currentPage: currentPage ?? this.currentPage,
       selectedFilter: selectedFilter ?? this.selectedFilter,
       currentRotation: currentRotation ?? this.currentRotation,
-      currentCorners: clearCorners ? null : (currentCorners ?? this.currentCorners),
+      currentCorners: clearCorners
+          ? null
+          : (currentCorners ?? this.currentCorners),
+      bwIntensity: bwIntensity ?? this.bwIntensity,
       isProcessing: isProcessing ?? this.isProcessing,
       hasUnsavedChanges: hasUnsavedChanges ?? this.hasUnsavedChanges,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
@@ -45,12 +56,13 @@ class PageEditorState extends Equatable {
 
   @override
   List<Object?> get props => [
-        currentPage,
-        selectedFilter,
-        currentRotation,
-        currentCorners,
-        isProcessing,
-        hasUnsavedChanges,
-        errorMessage,
-      ];
+    currentPage,
+    selectedFilter,
+    currentRotation,
+    currentCorners,
+    bwIntensity,
+    isProcessing,
+    hasUnsavedChanges,
+    errorMessage,
+  ];
 }

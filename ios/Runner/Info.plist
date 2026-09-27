@@ -12,6 +12,8 @@
 	<string>AnuScan requires camera access to scan documents.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>AnuScan requires photo library access to import document images.</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>AnuScan uses Face ID to securely unlock the application and protect your private documents.</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>

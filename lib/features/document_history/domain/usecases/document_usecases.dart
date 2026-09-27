@@ -19,7 +19,8 @@ class SaveDocumentUseCase {
   const SaveDocumentUseCase(this._repository);
   final DocumentRepository _repository;
 
-  Future<void> call(DocumentEntity document) => _repository.saveDocument(document);
+  Future<void> call(DocumentEntity document) =>
+      _repository.saveDocument(document);
 }
 
 class DeleteDocumentUseCase {
@@ -33,12 +34,14 @@ class RenameDocumentUseCase {
   const RenameDocumentUseCase(this._repository);
   final DocumentRepository _repository;
 
-  Future<void> call(String id, String newTitle) => _repository.renameDocument(id, newTitle);
+  Future<void> call(String id, String newTitle) =>
+      _repository.renameDocument(id, newTitle);
 }
 
 class SearchDocumentsUseCase {
   const SearchDocumentsUseCase(this._repository);
   final DocumentRepository _repository;
 
-  Future<List<DocumentEntity>> call(String query) => _repository.searchDocuments(query);
+  Future<List<DocumentEntity>> call(String query) =>
+      _repository.searchDocuments(query);
 }

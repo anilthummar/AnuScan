@@ -21,7 +21,9 @@ class DocumentEditorState extends Equatable {
   final String? errorMessage;
 
   ScannedPage? get selectedPage {
-    if (pages.isEmpty || selectedPageIndex < 0 || selectedPageIndex >= pages.length) {
+    if (pages.isEmpty ||
+        selectedPageIndex < 0 ||
+        selectedPageIndex >= pages.length) {
       return pages.isNotEmpty ? pages.first : null;
     }
     return pages[selectedPageIndex];
@@ -50,12 +52,12 @@ class DocumentEditorState extends Equatable {
 
   @override
   List<Object?> get props => [
-        documentId,
-        title,
-        pages,
-        selectedPageIndex,
-        isProcessing,
-        processingMessage,
-        errorMessage,
-      ];
+    documentId,
+    title,
+    pages,
+    selectedPageIndex,
+    isProcessing,
+    processingMessage,
+    errorMessage,
+  ];
 }
