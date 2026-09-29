@@ -7,6 +7,7 @@ import 'core/theme/app_theme.dart';
 import 'features/document_history/presentation/cubit/document_history_cubit.dart';
 import 'features/security/presentation/cubit/app_lock_cubit.dart';
 import 'features/security/presentation/widgets/app_lock_wrapper.dart';
+import 'features/subscription/presentation/cubit/subscription_cubit.dart';
 
 /// Main application widget with global providers, themes, and centralized routing.
 class AnuScanApp extends StatelessWidget {
@@ -21,6 +22,10 @@ class AnuScanApp extends StatelessWidget {
         ),
         BlocProvider<AppLockCubit>(
           create: (context) => sl<AppLockCubit>(),
+        ),
+        BlocProvider<SubscriptionCubit>(
+          create: (context) =>
+              sl<SubscriptionCubit>()..loadSubscription(),
         ),
       ],
       child: MaterialApp(

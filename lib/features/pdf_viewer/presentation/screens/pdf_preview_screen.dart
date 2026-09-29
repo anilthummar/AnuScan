@@ -19,6 +19,9 @@ import '../../domain/usecases/rename_pdf_usecase.dart';
 import '../../domain/usecases/share_pdf_usecase.dart';
 import '../cubit/pdf_preview_cubit.dart';
 import '../cubit/pdf_preview_state.dart';
+import '../../../../core/services/feature_access_service.dart';
+import '../../../../core/constants/premium_constants.dart';
+import '../../../subscription/presentation/widgets/feature_gate_sheet.dart';
 
 /// Screen for previewing generated PDF, changing page formats, renaming, sharing,
 /// opening with external applications, saving, and deleting documents.
@@ -245,6 +248,34 @@ class _PdfPreviewView extends StatelessWidget {
                         !state.isGenerating)
                     ? () => cubit.openExternal()
                     : null,
+              ),
+
+              // Advanced PDF Options
+              IconButton(
+                tooltip: PremiumConstants.isMonetizationHidden
+                    ? 'Advanced PDF Options'
+                    : 'Advanced PDF Options (Pro)',
+                icon: const Icon(Icons.tune),
+                onPressed: () {
+                  final accessService = sl<FeatureAccessService>();
+                  if (accessService.canUse(PremiumFeature.advancedPdfExport)) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          PremiumConstants.isMonetizationHidden
+                              ? 'Advanced PDF options active.'
+                              : 'Advanced PDF options active (Pro).',
+                        ),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  } else {
+                    FeatureGateSheet.show(
+                      context,
+                      feature: PremiumFeature.advancedPdfExport,
+                    );
+                  }
+                },
               ),
 
               // Extract text (OCR)

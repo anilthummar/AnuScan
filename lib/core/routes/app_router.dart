@@ -13,6 +13,7 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/document_history/presentation/screens/folders_screen.dart';
 import '../../features/document_history/presentation/screens/trash_screen.dart';
 import '../../features/document_history/presentation/screens/document_details_screen.dart';
+import '../../features/subscription/presentation/screens/premium_screen.dart';
 import 'app_routes.dart';
 
 /// Arguments for navigating to [PdfPreviewScreen].
@@ -194,6 +195,12 @@ class AppRouter {
         return _errorRoute(
           settings,
           'DocumentDetails requires a documentId argument.',
+        );
+
+      case AppRoutes.premium:
+        return MaterialPageRoute<void>(
+          settings: settings,
+          builder: (_) => const PremiumScreen(),
         );
 
       default:

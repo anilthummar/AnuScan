@@ -12,4 +12,5 @@ abstract class AppRoutes {
   static const String folders = '/folders';
   static const String trash = '/trash';
   static const String documentDetails = '/document-details';
+  static const String premium = '/premium';
 }

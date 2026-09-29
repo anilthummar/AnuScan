@@ -56,7 +56,14 @@ import '../services/local_auth_service.dart';
 import '../services/secure_storage_service.dart';
 import '../services/security_service.dart';
 import '../services/private_document_encryption_service.dart';
+import '../services/feature_access_service.dart';
 import '../../features/security/presentation/cubit/app_lock_cubit.dart';
+import '../../features/subscription/data/datasources/purchases_datasource.dart';
+import '../../features/subscription/data/datasources/revenuecat_purchases_datasource.dart';
+import '../../features/subscription/data/repositories/subscription_repository_impl.dart';
+import '../../features/subscription/domain/repositories/subscription_repository.dart';
+import '../../features/subscription/domain/usecases/subscription_usecases.dart';
+import '../../features/subscription/presentation/cubit/subscription_cubit.dart';
 import '../routes/app_router.dart';
 
 final GetIt sl = GetIt.instance;
@@ -83,6 +90,10 @@ Future<void> setupDependencyInjection({
   LocalAuthService? customLocalAuthService,
   SecurityService? customSecurityService,
   PrivateDocumentEncryptionService? customEncryptionService,
+  PurchasesDataSource? customPurchasesDataSource,
+  SubscriptionRepository? customSubscriptionRepository,
+  FeatureAccessService? customFeatureAccessService,
+  SubscriptionCubit? customSubscriptionCubit,
 }) async {
   // Database
   if (customDatabase != null) {
@@ -676,6 +687,86 @@ Future<void> setupDependencyInjection({
       () => AppLockCubit(
         securityService: sl<SecurityService>(),
         localAuthService: sl<LocalAuthService>(),
+      ),
+    );
+  }
+
+  // Monetization & Subscription (Phase 15)
+  if (customPurchasesDataSource != null) {
+    if (sl.isRegistered<PurchasesDataSource>()) {
+      await sl.unregister<PurchasesDataSource>();
+    }
+    sl.registerSingleton<PurchasesDataSource>(customPurchasesDataSource);
+  } else if (!sl.isRegistered<PurchasesDataSource>()) {
+    sl.registerLazySingleton<PurchasesDataSource>(
+      () => RevenueCatPurchasesDataSource(),
+    );
+  }
+
+  if (customSubscriptionRepository != null) {
+    if (sl.isRegistered<SubscriptionRepository>()) {
+      await sl.unregister<SubscriptionRepository>();
+    }
+    sl.registerSingleton<SubscriptionRepository>(customSubscriptionRepository);
+  } else if (!sl.isRegistered<SubscriptionRepository>()) {
+    sl.registerLazySingleton<SubscriptionRepository>(
+      () => SubscriptionRepositoryImpl(
+        purchasesDataSource: sl<PurchasesDataSource>(),
+        secureStorageService: sl<SecureStorageService>(),
+      ),
+    );
+  }
+
+  // Subscription Use Cases
+  if (!sl.isRegistered<GetSubscriptionInfoUseCase>()) {
+    sl.registerFactory(
+      () => GetSubscriptionInfoUseCase(sl<SubscriptionRepository>()),
+    );
+  }
+  if (!sl.isRegistered<GetSubscriptionProductsUseCase>()) {
+    sl.registerFactory(
+      () => GetSubscriptionProductsUseCase(sl<SubscriptionRepository>()),
+    );
+  }
+  if (!sl.isRegistered<PurchaseProductUseCase>()) {
+    sl.registerFactory(
+      () => PurchaseProductUseCase(sl<SubscriptionRepository>()),
+    );
+  }
+  if (!sl.isRegistered<RestorePurchasesUseCase>()) {
+    sl.registerFactory(
+      () => RestorePurchasesUseCase(sl<SubscriptionRepository>()),
+    );
+  }
+
+  // Feature Access Service
+  if (customFeatureAccessService != null) {
+    if (sl.isRegistered<FeatureAccessService>()) {
+      await sl.unregister<FeatureAccessService>();
+    }
+    sl.registerSingleton<FeatureAccessService>(customFeatureAccessService);
+  } else if (!sl.isRegistered<FeatureAccessService>()) {
+    sl.registerLazySingleton<FeatureAccessService>(
+      () => FeatureAccessServiceImpl(
+        subscriptionRepository: sl<SubscriptionRepository>(),
+      ),
+    );
+  }
+
+  // Subscription Cubit
+  if (customSubscriptionCubit != null) {
+    if (sl.isRegistered<SubscriptionCubit>()) {
+      await sl.unregister<SubscriptionCubit>();
+    }
+    sl.registerSingleton<SubscriptionCubit>(customSubscriptionCubit);
+  } else if (!sl.isRegistered<SubscriptionCubit>()) {
+    sl.registerLazySingleton<SubscriptionCubit>(
+      () => SubscriptionCubit(
+        getSubscriptionInfoUseCase: sl<GetSubscriptionInfoUseCase>(),
+        getSubscriptionProductsUseCase: sl<GetSubscriptionProductsUseCase>(),
+        purchaseProductUseCase: sl<PurchaseProductUseCase>(),
+        restorePurchasesUseCase: sl<RestorePurchasesUseCase>(),
+        externalUpdatesStream: sl<SubscriptionRepository>().subscriptionUpdates,
       ),
     );
   }

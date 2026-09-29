@@ -6,6 +6,10 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../security/presentation/cubit/app_lock_cubit.dart';
 import '../../../security/presentation/cubit/app_lock_state.dart';
 import '../../../security/presentation/screens/app_lock_screen.dart';
+import '../../../subscription/presentation/cubit/subscription_cubit.dart';
+import '../../../subscription/presentation/cubit/subscription_state.dart';
+import '../../../../core/constants/premium_constants.dart';
+import '../../../../core/routes/app_routes.dart';
 
 /// Settings screen for configuring app preferences, storage and offline mode.
 class SettingsScreen extends StatefulWidget {
@@ -128,6 +132,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
           const Divider(height: 32),
 
+          // AnuScan Pro (Hidden when monetization is hidden)
+          if (!PremiumConstants.isMonetizationHidden) ...[
+            const _SectionHeader(title: 'ANUSCAN PRO'),
+            _buildProSection(context),
+            const Divider(height: 32),
+          ],
+
           // Security & App Lock
           const _SectionHeader(title: 'SECURITY & APP LOCK'),
           _buildSecuritySection(context),
@@ -157,6 +168,114 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  SubscriptionCubit? _getSubscriptionCubit(BuildContext context) {
+    try {
+      return context.read<SubscriptionCubit>();
+    } catch (_) {
+      if (sl.isRegistered<SubscriptionCubit>()) {
+        return sl<SubscriptionCubit>();
+      }
+      return null;
+    }
+  }
+
+  Widget _buildProSection(BuildContext context) {
+    final cubit = _getSubscriptionCubit(context);
+    if (cubit == null) {
+      return ListTile(
+        leading: const Icon(
+          Icons.workspace_premium_outlined,
+          color: AppColors.secondary,
+        ),
+        title: const Text('AnuScan Pro'),
+        subtitle: const Text('Searchable PDFs, Advanced Export, & Batch Tools'),
+        trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+        onTap: () => Navigator.pushNamed(context, AppRoutes.premium),
+      );
+    }
+
+    return BlocBuilder<SubscriptionCubit, SubscriptionState>(
+      bloc: cubit,
+      builder: (context, subState) {
+        final isPro = subState.isPremium;
+        return Column(
+          children: [
+            ListTile(
+              leading: Icon(
+                isPro ? Icons.verified : Icons.workspace_premium_outlined,
+                color: isPro ? AppColors.success : AppColors.secondary,
+                size: 28,
+              ),
+              title: Text(
+                isPro ? 'AnuScan Pro (Active)' : 'Upgrade to AnuScan Pro',
+                style: const TextStyle(fontWeight: FontWeight.bold),
+              ),
+              subtitle: Text(
+                isPro
+                    ? (subState.info.isLifetime
+                        ? 'Lifetime License • Unlimited Offline Access'
+                        : 'Active Subscription • Renews automatically')
+                    : 'Searchable PDFs, Advanced Export, & Batch Tools',
+              ),
+              trailing: isPro
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 3,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.secondary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Text(
+                        'PRO',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    )
+                  : const Icon(Icons.arrow_forward_ios, size: 16),
+              onTap: () => Navigator.pushNamed(context, AppRoutes.premium),
+            ),
+            ListTile(
+              leading: const Icon(Icons.restore),
+              title: const Text('Restore Purchases'),
+              subtitle: const Text('Restore active subscriptions on this device'),
+              onTap: () {
+                cubit.restorePurchases();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Checking store for previous purchases...'),
+                    duration: Duration(seconds: 2),
+                  ),
+                );
+              },
+            ),
+            if (isPro)
+              ListTile(
+                leading: const Icon(Icons.open_in_new),
+                title: const Text('Manage Subscription'),
+                subtitle: const Text(
+                  'Manage or cancel renewal in App Store / Google Play',
+                ),
+                onTap: () {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text(
+                        'Manage your active subscription in your Google Play or App Store account settings.',
+                      ),
+                    ),
+                  );
+                },
+              ),
+          ],
+        );
+      },
     );
   }
 

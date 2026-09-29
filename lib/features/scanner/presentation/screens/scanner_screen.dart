@@ -18,10 +18,19 @@ import '../widgets/document_corner_overlay.dart';
 /// Screen managing device camera preview, real-time document boundary detection,
 /// auto & manual high-quality capture, keep/retake reviewing, and multi-page scanning.
 class ScannerScreen extends StatelessWidget {
-  const ScannerScreen({super.key});
+  const ScannerScreen({super.key, this.customCubit});
+
+  final ScannerCubit? customCubit;
 
   @override
   Widget build(BuildContext context) {
+    if (customCubit != null) {
+      return BlocProvider<ScannerCubit>.value(
+        value: customCubit!,
+        child: const _ScannerView(),
+      );
+    }
+
     return BlocProvider<ScannerCubit>(
       create: (context) {
         final cubit = ScannerCubit(
@@ -70,11 +79,18 @@ class _ScannerViewState extends State<_ScannerView>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (!mounted) return;
     final cubit = context.read<ScannerCubit>();
-    if (state == AppLifecycleState.paused ||
-        state == AppLifecycleState.inactive) {
-      cubit.cancel();
+    if (state == AppLifecycleState.paused) {
+      // Release camera hardware when app is backgrounded to avoid OS sensor lock.
+      if (cubit.state is ScannerReady ||
+          cubit.state is ScannerDetecting ||
+          cubit.state is ScannerInitializing) {
+        cubit.cancel();
+      }
     } else if (state == AppLifecycleState.resumed) {
-      cubit.initializeCamera();
+      // Re-initialize camera if it was released or previously failed.
+      if (cubit.state is ScannerInitial || cubit.state is ScannerFailure) {
+        cubit.initializeCamera();
+      }
     }
   }
 
@@ -103,64 +119,70 @@ class _ScannerViewState extends State<_ScannerView>
                 onPressed: () => Navigator.pop(context),
               ),
             ),
-            body: Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32.0),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      state.isPermissionDenied
-                          ? Icons.no_photography_outlined
-                          : Icons.error_outline,
-                      size: 64,
-                      color: AppColors.error,
-                    ),
-                    const SizedBox(height: 20),
-                    Text(
-                      state.isPermissionDenied
-                          ? 'Camera Permission Required'
-                          : 'Camera Error',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
+            body: SafeArea(
+              child: Center(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32.0,
+                    vertical: 20.0,
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        state.isPermissionDenied
+                            ? Icons.no_photography_outlined
+                            : Icons.error_outline,
+                        size: 64,
+                        color: AppColors.error,
                       ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      state.message,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    const SizedBox(height: 28),
-                    if (state.isPermissionDenied) ...[
-                      ElevatedButton.icon(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size(200, 48),
+                      const SizedBox(height: 20),
+                      Text(
+                        state.isPermissionDenied
+                            ? 'Camera Permission Required'
+                            : 'Camera Error',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
                         ),
-                        onPressed: () => openAppSettings(),
-                        icon: const Icon(Icons.settings),
-                        label: const Text('Open App Settings'),
+                        textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 12),
-                    ],
-                    OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white30),
-                        minimumSize: const Size(200, 48),
+                      Text(
+                        state.message,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      onPressed: () => cubit.initializeCamera(),
-                      child: const Text('Retry'),
-                    ),
-                  ],
+                      const SizedBox(height: 28),
+                      if (state.isPermissionDenied) ...[
+                        ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(200, 48),
+                          ),
+                          onPressed: () => openAppSettings(),
+                          icon: const Icon(Icons.settings),
+                          label: const Text('Open App Settings'),
+                        ),
+                        const SizedBox(height: 12),
+                      ],
+                      OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white30),
+                          minimumSize: const Size(200, 48),
+                        ),
+                        onPressed: () => cubit.initializeCamera(),
+                        child: const Text('Retry'),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),

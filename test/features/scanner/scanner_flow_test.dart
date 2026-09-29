@@ -12,6 +12,7 @@ import 'package:anuscan/features/scanner/domain/usecases/scan_document_usecase.d
 import 'package:anuscan/features/scanner/domain/usecases/scan_documents_usecase.dart';
 import 'package:anuscan/features/scanner/presentation/cubit/scanner_cubit.dart';
 import 'package:anuscan/features/scanner/presentation/cubit/scanner_state.dart';
+import 'package:anuscan/features/scanner/presentation/screens/scanner_screen.dart';
 import 'package:anuscan/features/scanner/presentation/widgets/document_corner_overlay.dart';
 
 class MockDocumentScannerRepository extends Mock
@@ -271,5 +272,48 @@ void main() {
 
       expect(find.byType(DocumentCornerOverlay), findsOneWidget);
     });
+  });
+
+  group('ScannerScreen layout tests', () {
+    testWidgets(
+      'renders ScannerFailure without RenderFlex overflow on small screen',
+      (tester) async {
+        tester.view.physicalSize = const Size(320, 480);
+        tester.view.devicePixelRatio = 1.0;
+        addTearDown(() {
+          tester.view.resetPhysicalSize();
+          tester.view.resetDevicePixelRatio();
+        });
+
+        final cubit = ScannerCubit(
+          scannerRepository: mockRepository,
+          scanDocumentUseCase: mockScanDocumentUseCase,
+          scanDocumentsUseCase: mockScanDocumentsUseCase,
+          importGalleryUseCase: mockImportGalleryUseCase,
+        );
+
+        cubit.emit(
+          const ScannerFailure(
+            message:
+                'Camera permission was denied. Please grant camera permission to scan documents.',
+            isPermissionDenied: true,
+          ),
+        );
+
+        await tester.pumpWidget(
+          MaterialApp(
+            home: ScannerScreen(customCubit: cubit),
+          ),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Camera Permission Required'), findsOneWidget);
+        expect(find.text('Open App Settings'), findsOneWidget);
+        expect(find.text('Retry'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+
+        await cubit.close();
+      },
+    );
   });
 }

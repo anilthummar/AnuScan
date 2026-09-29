@@ -12,6 +12,7 @@ import '../../../../core/utils/date_formatter.dart';
 import '../../../document_editor/domain/entities/scanned_page.dart';
 import '../../../document_editor/presentation/screens/document_editor_screen.dart';
 import '../../../pdf_viewer/presentation/screens/pdf_preview_screen.dart';
+import '../../domain/entities/document_counts.dart';
 import '../../domain/entities/document_entity.dart';
 import '../../domain/entities/document_query_filter.dart';
 import '../cubit/document_history_cubit.dart';
@@ -19,11 +20,18 @@ import '../cubit/document_history_state.dart';
 import '../widgets/document_card.dart';
 import '../widgets/document_grid_card.dart';
 import '../widgets/empty_state_view.dart';
+import '../widgets/category_selector_card.dart';
+import '../widgets/hero_scan_banner.dart';
+import '../widgets/home_bottom_navigation_bar.dart';
+import '../widgets/home_header.dart';
+import '../widgets/quick_actions_row.dart';
+import '../widgets/status_filter_pills.dart';
 import '../widgets/folder_picker_dialog.dart';
 import '../widgets/tag_picker_dialog.dart';
+import '../../../subscription/presentation/widgets/feature_gate_sheet.dart';
+import '../../../../core/constants/premium_constants.dart';
+import '../../../../core/services/feature_access_service.dart';
 import 'document_details_screen.dart';
-import 'folders_screen.dart';
-import 'trash_screen.dart';
 
 /// Main landing home screen displaying saved document history, search, filters,
 /// folder/tag management, view modes, and multi-selection bulk operations.
@@ -35,21 +43,13 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen> {
+  int _currentNavIndex = 0;
   bool _isSearchOpen = false;
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
   Timer? _debounce;
   String _selectedFilter = 'All';
 
-  static const _filterOptions = [
-    'All',
-    'Invoice',
-    'Receipt',
-    'Business Card',
-    'Contract',
-    'Certificate',
-    'Other',
-  ];
 
   @override
   void initState() {
@@ -448,6 +448,13 @@ class _HomeScreenState extends State<HomeScreen> {
                           .bulkArchive(true),
                     ),
                     IconButton(
+                      icon: const Icon(Icons.folder_zip_outlined),
+                      tooltip: PremiumConstants.isMonetizationHidden
+                          ? 'Batch Export'
+                          : 'Batch Export (Pro)',
+                      onPressed: () => _handleBatchExport(loaded),
+                    ),
+                    IconButton(
                       icon: Icon(
                         loaded.activeTab == DocumentTab.private
                             ? Icons.lock_open_outlined
@@ -471,165 +478,209 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ],
                 )
-              : AppBar(
-                  title: _isSearchOpen
-                      ? TextField(
-                          controller: _searchController,
-                          autofocus: true,
-                          decoration: const InputDecoration(
-                            hintText: 'Search documents, OCR, tags...',
-                            border: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                          ),
-                          onChanged: _onSearchChanged,
-                        )
-                      : const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              Icons.document_scanner,
-                              color: AppColors.primary,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'AnuScan',
-                              style: TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                  actions: [
-                    IconButton(
-                      icon: Icon(_isSearchOpen ? Icons.close : Icons.search),
-                      onPressed: () {
-                        setState(() {
-                          if (_isSearchOpen) {
-                            _isSearchOpen = false;
-                            _searchController.clear();
-                            context
-                                .read<DocumentHistoryCubit>()
-                                .searchDocuments('');
-                          } else {
-                            _isSearchOpen = true;
-                          }
-                        });
-                      },
-                    ),
-                    if (!_isSearchOpen && loaded != null) ...[
-                      IconButton(
-                        icon: Icon(
-                          loaded.viewMode == DocumentViewMode.grid
-                              ? Icons.view_list
-                              : Icons.grid_view,
-                        ),
-                        tooltip: loaded.viewMode == DocumentViewMode.grid
-                            ? 'List View'
-                            : 'Grid View',
-                        onPressed: () {
-                          final next = loaded.viewMode == DocumentViewMode.grid
-                              ? DocumentViewMode.list
-                              : DocumentViewMode.grid;
-                          context.read<DocumentHistoryCubit>().setViewMode(
-                                next,
-                              );
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.sort),
-                        tooltip: 'Sort Documents',
-                        onPressed: () =>
-                            _showSortBottomSheet(loaded.sortOption),
-                      ),
-                    ],
-                    PopupMenuButton<String>(
-                      icon: const Icon(Icons.more_horiz),
-                      tooltip: 'More options',
-                      onSelected: (val) {
-                        final cubit = context.read<DocumentHistoryCubit>();
-                        switch (val) {
-                          case 'folders':
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const FoldersScreen(),
-                              ),
-                            ).then((_) {
-                              cubit.loadDocuments();
-                            });
-                            break;
-                          case 'trash':
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const TrashScreen(),
-                              ),
-                            ).then((_) {
-                              cubit.loadDocuments();
-                            });
-                            break;
-                          case 'settings':
-                            Navigator.pushNamed(context, AppRoutes.settings);
-                            break;
-                        }
-                      },
-                      itemBuilder: (context) => [
-                        const PopupMenuItem(
-                          value: 'folders',
-                          child: Row(
-                            children: [
-                              Icon(Icons.folder_outlined, size: 20),
-                              SizedBox(width: 10),
-                              Text('Folders'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'trash',
-                          child: Row(
-                            children: [
-                              Icon(Icons.delete_outline, size: 20),
-                              SizedBox(width: 10),
-                              Text('Trash'),
-                            ],
-                          ),
-                        ),
-                        const PopupMenuItem(
-                          value: 'settings',
-                          child: Row(
-                            children: [
-                              Icon(Icons.settings_outlined, size: 20),
-                              SizedBox(width: 10),
-                              Text('Settings'),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-          body: _buildBody(context, state),
+              : null,
+          backgroundColor: const Color(0xFFF8FAFC),
+          body: SafeArea(
+            bottom: false,
+            child: _buildBody(context, state),
+          ),
           floatingActionButton: isSelectionMode
               ? null
-              : FloatingActionButton.extended(
-                  backgroundColor: AppColors.primary,
-                  icon: const Icon(Icons.camera_alt),
-                  label: const Text('Scan'),
+              : FloatingActionButton(
+                  backgroundColor: const Color(0xFF1D4ED8),
+                  foregroundColor: Colors.white,
+                  shape: const CircleBorder(),
+                  elevation: 4,
+                  tooltip: 'Scan Document',
                   onPressed: _startCameraScan,
+                  child: const Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Icon(Icons.camera_alt, size: 28),
+                      Offstage(
+                        offstage: true,
+                        child: Text('Scan'),
+                      ),
+                    ],
+                  ),
                 ),
           floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
+          bottomNavigationBar: isSelectionMode
+              ? null
+              : HomeBottomNavigationBar(
+                  currentIndex: _currentNavIndex,
+                  onTap: _onBottomNavTapped,
+                ),
         );
       },
     );
   }
 
-  Widget _buildBody(BuildContext context, DocumentHistoryState state) {
-    if (state is DocumentHistoryLoading) {
-      return const Center(child: CircularProgressIndicator());
+  void _handleBatchExport(DocumentHistoryLoaded loaded) {
+    final featureAccess =
+        sl.isRegistered<FeatureAccessService>()
+            ? sl<FeatureAccessService>()
+            : null;
+    if (featureAccess != null &&
+        !featureAccess.canUse(PremiumFeature.batchPdfExport)) {
+      FeatureGateSheet.show(
+        context,
+        feature: PremiumFeature.batchPdfExport,
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Batch export initiated for ${loaded.selectedDocumentIds.length} documents.',
+          ),
+          backgroundColor: AppColors.success,
+        ),
+      );
     }
+  }
 
+  void _showCloudBackupInfoSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 56,
+                height: 56,
+                decoration: const BoxDecoration(
+                  color: Color(0xFFDCFCE7),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(
+                  Icons.cloud_outlined,
+                  size: 28,
+                  color: Color(0xFF16A34A),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Offline-First & Local Storage',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF0F172A),
+                ),
+              ),
+              const SizedBox(height: 10),
+              const Text(
+                'AnuScan is built with a 100% offline-first privacy architecture. Your documents, photos, and OCR text remain securely on your device only and are never uploaded to any cloud server.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: Color(0xFF64748B),
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF1D4ED8),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  icon: const Icon(Icons.check, size: 18),
+                  label: const Text('Understood'),
+                  onPressed: () => Navigator.pop(ctx),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _onBottomNavTapped(int index) {
+    if (index == 0) {
+      setState(() {
+        _currentNavIndex = 0;
+        _isSearchOpen = false;
+      });
+    } else if (index == 1) {
+      setState(() {
+        _currentNavIndex = 1;
+      });
+    } else if (index == 2) {
+      Navigator.pushNamed(context, AppRoutes.folders).then((_) {
+        if (mounted) context.read<DocumentHistoryCubit>().loadDocuments();
+      });
+    } else if (index == 3) {
+      Navigator.pushNamed(context, AppRoutes.settings).then((_) {
+        if (mounted) context.read<DocumentHistoryCubit>().loadDocuments();
+      });
+    }
+  }
+
+  Widget _buildSearchBar() {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.03),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.search, color: Color(0xFF64748B), size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: TextField(
+              controller: _searchController,
+              autofocus: true,
+              decoration: const InputDecoration(
+                hintText: 'Search documents, OCR, tags...',
+                hintStyle: TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.symmetric(vertical: 12),
+              ),
+              onChanged: _onSearchChanged,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.close, size: 20, color: Color(0xFF64748B)),
+            splashRadius: 18,
+            onPressed: () {
+              setState(() {
+                _isSearchOpen = false;
+                _searchController.clear();
+                context.read<DocumentHistoryCubit>().searchDocuments('');
+              });
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBody(BuildContext context, DocumentHistoryState state) {
     if (state is DocumentHistoryError) {
       return Center(
         child: Padding(
@@ -652,137 +703,143 @@ class _HomeScreenState extends State<HomeScreen> {
       );
     }
 
-    if (state is DocumentHistoryLoaded) {
-      final cubit = context.read<DocumentHistoryCubit>();
+    final loaded = state is DocumentHistoryLoaded ? state : null;
+    final cubit = context.read<DocumentHistoryCubit>();
 
-      return RefreshIndicator(
-        onRefresh: () => cubit.loadDocuments(),
-        child: CustomScrollView(
-          controller: _scrollController,
-          physics: const AlwaysScrollableScrollPhysics(),
-          slivers: [
-            // Top Filter Tabs (All, Favorites, Folders, Archived)
-            SliverToBoxAdapter(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Tab selector row
+    return RefreshIndicator(
+      onRefresh: () => cubit.loadDocuments(),
+      child: CustomScrollView(
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          // Top Section (Header, Filter Pills, Category Selector, Hero Banner, Quick Actions)
+          SliverToBoxAdapter(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_isSearchOpen)
+                  _buildSearchBar()
+                else
+                  HomeHeader(
+                    isGridMode: loaded?.viewMode == DocumentViewMode.grid,
+                    onSearchPressed: () {
+                      setState(() {
+                        _isSearchOpen = true;
+                      });
+                    },
+                    onViewModeToggle: () {
+                      if (loaded != null) {
+                        final next = loaded.viewMode == DocumentViewMode.grid
+                            ? DocumentViewMode.list
+                            : DocumentViewMode.grid;
+                        cubit.setViewMode(next);
+                      }
+                    },
+                    onSettingsPressed: () {
+                      Navigator.pushNamed(context, AppRoutes.settings).then((_) {
+                        if (mounted) cubit.loadDocuments();
+                      });
+                    },
+                  ),
+
+                // Status Filter Pills (All, Favorites, Archived, Private)
+                StatusFilterPills(
+                  activeTab: loaded?.activeTab ?? DocumentTab.all,
+                  counts: loaded?.counts ?? const DocumentCounts(),
+                  onTabSelected: (tab) => cubit.setActiveTab(tab),
+                ),
+
+                // Category Selector Card
+                CategorySelectorCard(
+                  selectedCategory: _selectedFilter,
+                  onCategorySelected: (cat) {
+                    setState(() {
+                      _selectedFilter = cat;
+                    });
+                    cubit.setDocumentTypeFilter(cat);
+                  },
+                ),
+
+                // Active Filter Summary row if active
+                if (loaded != null && loaded.filter.hasActiveFilters)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 4),
-                    child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildTabChip(
-                            label: 'All (${state.counts.activeCount})',
-                            isSelected: state.activeTab == DocumentTab.all,
-                            onTap: () => cubit.setActiveTab(DocumentTab.all),
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.filter_list,
+                          size: 16,
+                          color: AppColors.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            _buildActiveFilterText(loaded.filter),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.primary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
-                          const SizedBox(width: 8),
-                          _buildTabChip(
-                            label: 'Favorites (${state.counts.favoriteCount})',
-                            isSelected:
-                                state.activeTab == DocumentTab.favorites,
-                            onTap: () =>
-                                cubit.setActiveTab(DocumentTab.favorites),
+                        ),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(50, 24),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                           ),
-                          const SizedBox(width: 8),
-                          _buildTabChip(
-                            label: 'Archived (${state.counts.archivedCount})',
-                            isSelected: state.activeTab == DocumentTab.archived,
-                            onTap: () =>
-                                cubit.setActiveTab(DocumentTab.archived),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildTabChip(
-                            label: 'Private (${state.counts.privateCount})',
-                            isSelected: state.activeTab == DocumentTab.private,
-                            onTap: () =>
-                                cubit.setActiveTab(DocumentTab.private),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Document Type chips
-                  SizedBox(
-                    height: 38,
-                    child: ListView.separated(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      itemCount: _filterOptions.length,
-                      separatorBuilder: (_, __) => const SizedBox(width: 8),
-                      itemBuilder: (context, i) {
-                        final filter = _filterOptions[i];
-                        final isSelected = filter == _selectedFilter;
-                        return ChoiceChip(
-                          label: Text(
-                            filter,
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                          selected: isSelected,
-                          onSelected: (_) {
+                          onPressed: () {
                             setState(() {
-                              _selectedFilter = filter;
+                              _selectedFilter = 'All';
                             });
-                            cubit.setDocumentTypeFilter(filter);
+                            cubit.clearFilters();
                           },
-                        );
-                      },
+                          child: const Text(
+                            'Reset',
+                            style: TextStyle(fontSize: 12),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
 
-                  // Active Filter Summary row if active
-                  if (state.filter.hasActiveFilters)
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 6, 16, 0),
-                      child: Row(
-                        children: [
-                          const Icon(
-                            Icons.filter_list,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              _buildActiveFilterText(state.filter),
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: AppColors.primary,
-                                fontWeight: FontWeight.w500,
-                              ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                          TextButton(
-                            style: TextButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(50, 24),
-                              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _selectedFilter = 'All';
-                              });
-                              cubit.clearFilters();
-                            },
-                            child: const Text(
-                              'Reset',
-                              style: TextStyle(fontSize: 12),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 6),
+                // Hero Banner and Quick Actions (only on Home tab when not searching)
+                if (_currentNavIndex == 0 &&
+                    !_isSearchOpen &&
+                    !(loaded?.filter.hasActiveFilters ?? false)) ...[
+                  const SizedBox(height: 12),
+                  HeroScanBanner(
+                    onScanNow: _startCameraScan,
+                  ),
+                  const SizedBox(height: 14),
+                  QuickActionsRow(
+                    onImportGallery: _startGalleryImport,
+                    onCreatePdf: _startCameraScan,
+                    onCloudBackup: _showCloudBackupInfoSheet,
+                    onAppLock: () {
+                      Navigator.pushNamed(context, AppRoutes.settings);
+                    },
+                  ),
+                  const SizedBox(height: 12),
                 ],
-              ),
+              ],
             ),
+          ),
 
+          if (state is DocumentHistoryLoading || state is DocumentHistoryInitial)
+            const SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: EdgeInsets.symmetric(vertical: 32),
+                  child: CircularProgressIndicator(),
+                ),
+              ),
+            )
+          else if (loaded != null) ...[
             // Section Header (Recent Documents or Search Results)
-            if (state.documents.isNotEmpty)
+            if (loaded.documents.isNotEmpty)
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
@@ -791,23 +848,40 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(
                         _isSearchOpen ||
-                                (state.filter.searchQuery != null &&
-                                    state.filter.searchQuery!.isNotEmpty)
-                            ? 'Search Results (${state.documents.length})'
+                                (loaded.filter.searchQuery != null &&
+                                    loaded.filter.searchQuery!.isNotEmpty)
+                            ? 'Search Results (${loaded.documents.length})'
                             : 'Recent Documents',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
-                      Text(
-                        '${state.documents.length} ${state.documents.length == 1 ? 'file' : 'files'}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Theme.of(
-                            context,
-                          ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
-                        ),
+                      Row(
+                        children: [
+                          Text(
+                            '${loaded.documents.length} ${loaded.documents.length == 1 ? 'file' : 'files'}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(
+                                context,
+                              ).textTheme.bodySmall?.color?.withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(4),
+                            onTap: () => _showSortBottomSheet(loaded.sortOption),
+                            child: const Padding(
+                              padding: EdgeInsets.all(2),
+                              child: Icon(
+                                Icons.sort_rounded,
+                                size: 18,
+                                color: Color(0xFF64748B),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
@@ -815,7 +889,7 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
 
             // Document Content
-            if (state.documents.isEmpty)
+            if (loaded.documents.isEmpty)
               SliverFillRemaining(
                 hasScrollBody: false,
                 child: EmptyStateView(
@@ -823,7 +897,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   onGalleryPressed: _startGalleryImport,
                 ),
               )
-            else if (state.viewMode == DocumentViewMode.grid)
+            else if (loaded.viewMode == DocumentViewMode.grid)
               SliverPadding(
                 padding: const EdgeInsets.fromLTRB(12, 0, 12, 88),
                 sliver: SliverGrid(
@@ -834,14 +908,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisSpacing: 4,
                   ),
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final doc = state.documents[index];
-                    final isSelected = state.selectedDocumentIds.contains(
+                    final doc = loaded.documents[index];
+                    final isSelected = loaded.selectedDocumentIds.contains(
                       doc.id,
                     );
                     return DocumentGridCard(
                       document: doc,
                       isSelected: isSelected,
-                      isSelectionMode: state.isSelectionMode,
+                      isSelectionMode: loaded.isSelectionMode,
                       onTap: () => _openDocument(doc),
                       onOpen: () => _openDocument(doc),
                       onViewDetails: () => _openDetails(doc),
@@ -859,7 +933,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       onSelectToggle: () => cubit.toggleSelection(doc.id),
                       onLongPress: () => cubit.toggleSelection(doc.id),
                     );
-                  }, childCount: state.documents.length),
+                  }, childCount: loaded.documents.length),
                 ),
               )
             else
@@ -867,14 +941,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 padding: const EdgeInsets.only(bottom: 88),
                 sliver: SliverList(
                   delegate: SliverChildBuilderDelegate((context, index) {
-                    final doc = state.documents[index];
-                    final isSelected = state.selectedDocumentIds.contains(
+                    final doc = loaded.documents[index];
+                    final isSelected = loaded.selectedDocumentIds.contains(
                       doc.id,
                     );
                     return DocumentCard(
                       document: doc,
                       isSelected: isSelected,
-                      isSelectionMode: state.isSelectionMode,
+                      isSelectionMode: loaded.isSelectionMode,
                       onTap: () => _openDocument(doc),
                       onOpen: () => _openDocument(doc),
                       onViewDetails: () => _openDetails(doc),
@@ -892,12 +966,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       onSelectToggle: () => cubit.toggleSelection(doc.id),
                       onLongPress: () => cubit.toggleSelection(doc.id),
                     );
-                  }, childCount: state.documents.length),
+                  }, childCount: loaded.documents.length),
                 ),
               ),
 
             // Pagination loader indicator
-            if (state.isLoadingMore)
+            if (loaded.isLoadingMore)
               const SliverToBoxAdapter(
                 child: Padding(
                   padding: EdgeInsets.symmetric(vertical: 16),
@@ -911,30 +985,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
           ],
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  Widget _buildTabChip({
-    required String label,
-    required bool isSelected,
-    required VoidCallback onTap,
-  }) {
-    return FilterChip(
-      label: Text(label),
-      selected: isSelected,
-      selectedColor: AppColors.primary.withValues(alpha: 0.15),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-        color: isSelected ? AppColors.primary : null,
+        ],
       ),
-      onSelected: (_) => onTap(),
     );
   }
+
 
   String _buildActiveFilterText(DocumentQueryFilter filter) {
     final parts = <String>[];

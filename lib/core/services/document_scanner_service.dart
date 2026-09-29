@@ -98,6 +98,7 @@ class DocumentScannerServiceImpl implements DocumentScannerService {
   CameraController? _controller;
   bool _isFlashOn = false;
   bool _isDisposed = false;
+  bool _isInitializing = false;
 
   StreamController<DocumentCornerPoints?> _cornersController =
       StreamController<DocumentCornerPoints?>.broadcast();
@@ -145,27 +146,48 @@ class DocumentScannerServiceImpl implements DocumentScannerService {
 
   @override
   Future<void> initialize() async {
-    _isDisposed = false;
-    if (_cornersController.isClosed) {
-      _cornersController = StreamController<DocumentCornerPoints?>.broadcast();
-    }
-    if (_detectionController.isClosed) {
-      _detectionController =
-          StreamController<DocumentDetectionResult>.broadcast();
+    if (_isInitializing) return;
+    if (!_isDisposed && _controller != null && _controller!.value.isInitialized) {
+      return;
     }
 
-    // 1. Check and request camera permission
-    final hasPermission = await checkPermission();
-    if (!hasPermission) {
-      final granted = await requestPermission();
-      if (!granted) {
-        throw const PermissionException(
-          'Camera permission was denied by the user.',
-        );
-      }
-    }
-
+    _isInitializing = true;
     try {
+      _isDisposed = false;
+      if (_cornersController.isClosed) {
+        _cornersController =
+            StreamController<DocumentCornerPoints?>.broadcast();
+      }
+      if (_detectionController.isClosed) {
+        _detectionController =
+            StreamController<DocumentDetectionResult>.broadcast();
+      }
+
+      // 1. Check and request camera permission
+      final hasPermission = await checkPermission();
+      if (!hasPermission) {
+        final granted = await requestPermission();
+        if (!granted) {
+          throw const PermissionException(
+            'Camera permission was denied by the user.',
+          );
+        }
+      }
+
+      // Ensure _isDisposed wasn't set while awaiting permission dialog
+      _isDisposed = false;
+
+      // Safely dispose old controller before creating new one
+      if (_controller != null) {
+        try {
+          if (_isFlashOn) {
+            await _controller!.setFlashMode(FlashMode.off);
+          }
+          await _controller!.dispose();
+        } catch (_) {}
+        _controller = null;
+      }
+
       // 2. Discover available cameras
       final cameras = _injectedCameras ?? await availableCameras();
       if (cameras.isEmpty) {
@@ -180,15 +202,22 @@ class DocumentScannerServiceImpl implements DocumentScannerService {
         orElse: () => cameras.first,
       );
 
-      // 4. Initialize CameraController at very high resolution preset for document clarity
+      // 4. Initialize CameraController at high resolution preset (1080p)
       _controller = CameraController(
         selectedCamera,
-        ResolutionPreset.veryHigh,
+        ResolutionPreset.high,
         enableAudio: false,
         imageFormatGroup: ImageFormatGroup.jpeg,
       );
 
       await _controller!.initialize();
+      if (_isDisposed) {
+        try {
+          await _controller!.dispose();
+        } catch (_) {}
+        _controller = null;
+        return;
+      }
       _isFlashOn = false;
 
       // 5. Start real-time document edge / rectangle detection loop
@@ -197,6 +226,8 @@ class DocumentScannerServiceImpl implements DocumentScannerService {
       rethrow;
     } catch (e) {
       throw ScannerException('Camera initialization failed: $e', e);
+    } finally {
+      _isInitializing = false;
     }
   }
 
@@ -308,7 +339,12 @@ class DocumentScannerServiceImpl implements DocumentScannerService {
       );
     }
 
-    return Center(child: CameraPreview(_controller!));
+    return Center(
+      child: CameraPreview(
+        _controller!,
+        key: ValueKey(_controller),
+      ),
+    );
   }
 
   @override

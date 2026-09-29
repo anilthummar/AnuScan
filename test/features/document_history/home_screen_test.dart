@@ -75,6 +75,12 @@ void main() {
   testWidgets('renders EmptyStateView when document history is empty', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     when(() => mockGetDocuments()).thenAnswer((_) async => []);
 
     final cubit = DocumentHistoryCubit(
@@ -95,6 +101,12 @@ void main() {
   testWidgets(
     'renders Recent Documents section and DocumentCards when history has items',
     (tester) async {
+      tester.view.physicalSize = const Size(800, 1600);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
       when(
         () => mockGetDocuments(),
       ).thenAnswer((_) async => [testDoc1, testDoc2]);
@@ -159,6 +171,12 @@ void main() {
   testWidgets('shows rename dialog and calls cubit when confirmed', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     when(() => mockGetDocuments()).thenAnswer((_) async => [testDoc1]);
     when(
       () => mockRenameDocument('doc_1', 'New Passport'),
@@ -201,6 +219,12 @@ void main() {
   testWidgets('shows delete confirmation dialog and calls cubit when confirmed', (
     tester,
   ) async {
+    tester.view.physicalSize = const Size(800, 1600);
+    tester.view.devicePixelRatio = 1.0;
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     when(() => mockGetDocuments()).thenAnswer((_) async => [testDoc1]);
     when(() => mockDeleteDocument('doc_1')).thenAnswer((_) async {});
 

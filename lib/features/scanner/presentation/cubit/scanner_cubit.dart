@@ -41,18 +41,24 @@ class ScannerCubit extends Cubit<ScannerState> {
   Timer? _autoCaptureTimer;
   Timer? _autoCaptureCooldown;
   bool _isCooldownActive = false;
+  bool _isInitializingCamera = false;
 
   /// Starts the camera scanning workflow: requests permissions, initializes sensor,
   /// and listens to real-time detection results and corners.
   Future<void> initializeCamera() async {
+    if (_isInitializingCamera) return;
+    _isInitializingCamera = true;
+
     emit(const ScannerInitializing());
     _cornersSubscription?.cancel();
     _detectionSubscription?.cancel();
     _autoCaptureTimer?.cancel();
     _autoCaptureTimer = null;
 
-    final result = await scannerRepository.initializeScanner();
-    result.fold(
+    try {
+      final result = await scannerRepository.initializeScanner();
+      if (isClosed) return;
+      result.fold(
       onFailure: (failure) {
         final isPermission = failure is PermissionFailure;
         emit(
@@ -132,7 +138,10 @@ class ScannerCubit extends Cubit<ScannerState> {
         });
       },
     );
+  } finally {
+    _isInitializingCamera = false;
   }
+}
 
   /// Toggles between manual and auto-capture modes.
   void toggleAutoCapture() {
@@ -363,7 +372,9 @@ class ScannerCubit extends Cubit<ScannerState> {
     _autoCaptureCooldown?.cancel();
     _autoCaptureCooldown = null;
     await scannerRepository.releaseScanner();
-    emit(const ScannerInitial());
+    if (!isClosed) {
+      emit(const ScannerInitial());
+    }
   }
 
   @override
